@@ -17,7 +17,7 @@ Nenhuma biblioteca de terceiros é compilada ou distribuída com o RPCS1 neste m
 
 | Fonte | Uso | Procedência / licença |
 |---|---|---|
-| psx-spx — <https://psx-spx.consoledev.net/> | Fatos de hardware (endereços, bits, comportamento) | Derivado do "Nocash PSX Specifications" (Martin Korth); o próprio site declara não ser *clean-room*. Licença de reprodução do texto **a verificar** antes de citar trechos literais. O RPCS1 não copia pseudocódigo para o código-fonte. |
+| psx-spx — <https://psx-spx.consoledev.net/> | Fatos de hardware (endereços, bits, comportamento) | Derivado do "Nocash PSX Specifications" (Martin Korth). ⚠️ A página inicial declara que o documento **não é clean-room** e que contém texto copiado ou reescrito de material confidencial da Sony. O RPCS1 usa apenas fatos de comportamento do hardware, sem reproduzir texto nem pseudocódigo; a avaliação jurídica dessa procedência cabe ao PiStudio BR antes da distribuição ampla. Licença de reprodução do texto **a verificar**. |
 | psx.wiki — <https://psx.wiki/> | Conferência cruzada (planejada) | Ainda não consultado; licença a verificar |
 
 ## Proibido no repositório

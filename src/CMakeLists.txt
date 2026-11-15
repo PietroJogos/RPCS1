@@ -35,6 +35,8 @@ add_library(rpcs1_hw STATIC
     bus/address.cpp
     bus/bus.cpp
     bus/io_device.cpp
+    cpu/cpu.cpp
+    cpu/disassembler.cpp
     memory/bios_rom.cpp
     memory/memory_control.cpp)
 target_link_libraries(rpcs1_hw PUBLIC rpcs1_core)

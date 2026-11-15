@@ -2,6 +2,19 @@
 
 Formato baseado em "Keep a Changelog". Versões seguem SemVer; antes da 0.1.0 todas são pré-lançamentos.
 
+## [0.0.3] — 15/11/2026 — pré-alfa (Fase 3)
+
+### Adicionado
+- Interpretador da CPU R3000A: ALU, deslocamentos, loads/stores (inclusive LWL/LWR/SWL/SWR),
+  desvios e saltos com delay slot, load delay slot, MULT/DIV com latência documentada.
+- Detecção de exceções (Ov, AdEL, AdES, IBE, DBE, Sys, Bp, RI) com EPC/BD/BT/TAR/BadVaddr.
+- Desmontador MIPS para logs.
+- A BIOS configurada é executada até a primeira instrução de coprocessador (limite atual).
+- Codificador MIPS e gerador de BIOS sintética para testes; 56 testes de CPU.
+
+### Não incluído
+- COP0, despacho de exceções e interrupções (Fase 4); GTE; vídeo; áudio; periféricos.
+
 ## [0.0.2] — 15/11/2026 — pré-alfa (Fase 2)
 
 ### Adicionado

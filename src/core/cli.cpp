@@ -106,9 +106,10 @@ std::string usage_text() {
            "      --headless         Não abre janela (testes automatizados).\n"
            "      --exit-after <ms>  Encerra automaticamente após <ms> milissegundos.\n"
            "\n"
-           "Estado atual: Fase 2 (memória e barramento). A BIOS configurada é\n"
-           "validada e mapeada, mas nada é executado: CPU, GPU e demais periféricos\n"
-           "ainda não existem. A janela exibe somente uma tela preta sem sinal.\n";
+           "Estado atual: Fase 3 (CPU). A BIOS configurada é executada pela CPU\n"
+           "emulada até a primeira instrução que dependa de um componente ainda\n"
+           "inexistente (COP0, GTE, periféricos). Não há vídeo nem áudio: a janela\n"
+           "exibe somente uma tela preta sem sinal.\n";
 }
 
 } // namespace rpcs1

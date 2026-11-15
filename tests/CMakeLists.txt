@@ -14,6 +14,12 @@ add_executable(rpcs1_tests
     core/test_unicode.cpp
     bus/test_address.cpp
     bus/test_bus.cpp
+    cpu/test_cpu_alu.cpp
+    cpu/test_cpu_branch.cpp
+    cpu/test_cpu_exceptions.cpp
+    cpu/test_cpu_memory.cpp
+    cpu/test_cpu_muldiv.cpp
+    cpu/test_cpu_programs.cpp
     memory/test_bios_rom.cpp
     memory/test_memory_block.cpp
     memory/test_memory_control.cpp
@@ -68,10 +74,17 @@ add_test(NAME smoke.invalid_config
         -P "${CMAKE_CURRENT_SOURCE_DIR}/smoke/expect_exit.cmake")
 set_tests_properties(smoke.invalid_config PROPERTIES LABELS "smoke")
 
-# BIOS sintética: carregada e mapeada; tamanho errado e arquivo ausente rejeitados.
+# Gerador de BIOS sintética (programa MIPS próprio; nenhum código da Sony).
+add_executable(rpcs1_make_test_bios tools/make_test_bios.cpp)
+target_include_directories(rpcs1_make_test_bios PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(rpcs1_make_test_bios PRIVATE rpcs1_core)
+rpcs1_configure_target(rpcs1_make_test_bios)
+
+# BIOS sintética executada pela CPU; tamanho errado e arquivo ausente rejeitados.
 add_test(NAME smoke.bios_load
     COMMAND ${CMAKE_COMMAND}
         -DRPCS1_EXE=$<TARGET_FILE:rpcs1>
+        -DMAKE_BIOS=$<TARGET_FILE:rpcs1_make_test_bios>
         -DWORK_DIR=${RPCS1_SMOKE_DIR}/bios_load
         -P "${CMAKE_CURRENT_SOURCE_DIR}/smoke/bios_load.cmake")
 set_tests_properties(smoke.bios_load PROPERTIES LABELS "smoke")

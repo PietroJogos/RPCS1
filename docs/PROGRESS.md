@@ -10,8 +10,8 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
 | 0 | Fundação do projeto | **concluída** | Build MSVC Debug/Release sem avisos; testes unitários e smoke tests passando |
 | 1 | Documentação técnica | **concluída (1ª versão)** | `HARDWARE_ARCHITECTURE.md`; 11 lacunas registradas para fases futuras |
 | 2 | Memória e barramento | **concluída** | 38 testes novos; 7 comportamentos não documentados adotados e marcados ⚠️ (D-012 a D-017) |
-| 3 | CPU R3000A | não iniciada | Próxima fase |
-| 4 | COP0, exceções, cache | não iniciada | |
+| 3 | CPU R3000A | **concluída** | Interpretador sem coprocessadores; 56 testes novos; exceções detectadas (despacho na Fase 4) |
+| 4 | COP0, exceções, cache | não iniciada | Próxima fase |
 | 5 | Scheduler e timers | não iniciada | Decisão pendente sobre clock de vídeo PAL |
 | 6 | DMA | não iniciada | |
 | 7 | GPU: registradores e VRAM | não iniciada | |
@@ -73,14 +73,32 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
   `UnimplementedDevice` (leem 0 e avisam no log, citando a fase prevista).
 - **Frontend:** `[BIOS] path` agora é carregado e mapeado (sem execução) e o resultado aparece no log.
 
+## Fase 3 — o que foi realmente implementado
+
+- **Interpretador R3000A** (`src/cpu`) com todas as instruções sem coprocessador: ALU e
+  imediatos (sinal/zero conforme o psx-spx), deslocamentos (5 bits baixos), LB/LBU/LH/LHU/LW,
+  SB/SH/SW, LWL/LWR/SWL/SWR, BEQ/BNE/BLEZ/BGTZ, BcondZ (com link incondicional), J/JAL/JR/JALR,
+  MULT/MULTU/DIV/DIVU com HI/LO, MFHI/MFLO/MTHI/MTLO, SYSCALL/BREAK.
+- **Delay slot de desvio** e **load delay slot** (inclusive LWL/LWR encadeadas, escrita no slot
+  e conclusão da carga em exceção).
+- **Latências documentadas** de MULT (6/9/13 por `rs`) e DIV (36), com bloqueio de MFHI/MFLO.
+- **Detecção de exceções** com EPC, BD, BT, TAR e BadVaddr: Ov, AdEL (dados e busca), AdES,
+  IBE, DBE, Sys, Bp e RI (tabela completa de opcodes reservados).
+- **Desmontador** para logs.
+- **Codificador MIPS** em `tests/` para escrever programas de teste sem toolchain externa, e um
+  gerador de **BIOS sintética** para os testes de fumaça.
+- **Frontend:** a BIOS configurada é executada até a primeira instrução que dependa de um
+  componente inexistente; o log informa quantas instruções rodaram e onde parou.
+
 ## Recursos ausentes (conscientemente)
 
-- CPU e todos os periféricos (GPU, GTE, MDEC, SPU, CD-ROM, DMA, timers, IRQ, SIO, controles,
-  Memory Cards); execução da BIOS.
-- No barramento: temporização dos acessos e fila de escrita (Fase 5), isolamento de cache e
-  efeitos do BCC (Fase 4), realocação da Expansão 1, dispositivos de expansão.
+- COP0 (SR, CAUSE, EPC, vetores, RFE, interrupções) e o desvio ao tratador de exceção — Fase 4.
+  Uma BIOS real para no primeiro `MTC0`/`MFC0`.
+- GTE (COP2), GPU, SPU, CD-ROM, DMA, timers, controlador de IRQ, SIO, controles, Memory Cards.
+- Temporização de memória, I-cache e fila de escrita (Fases 4 e 5).
 
 ## Próxima dependência técnica
 
-**Fase 3 — CPU R3000A (interpretador)** (`src/cpu`): busca instruções pelo `Bus`, que já entrega
-os erros de alinhamento e de barramento que a CPU transformará em exceções na Fase 4.
+**Fase 4 — COP0, exceções e cache:** registradores SR/CAUSE/EPC/BadVaddr/PRID, `MFC0`/`MTC0`/`RFE`,
+despacho aos vetores usando os `ExceptionRecord` já produzidos pela CPU, interrupções via CAUSE
+bit 10 e isolamento de cache (necessário para a BIOS limpar a I-cache).

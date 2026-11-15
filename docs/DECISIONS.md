@@ -99,6 +99,40 @@ acrescentadas no fim; decisões revistas são marcadas como substituídas, não 
 - **Decisão:** os operandos são copiados e comparados por função auxiliar; stdout dos testes
   sem buffer para que uma queda não esconda a saída anterior.
 
+## D-019 — Modelo do load delay slot (Fase 3) ⚠️ em parte
+- **Documentado:** a instrução seguinte vê o valor antigo; a carga se completa mesmo se houver
+  exceção logo depois; LWL/LWR encadeadas no mesmo registrador veem o valor pendente.
+- **Derivado do pipeline de 5 estágios (não documentado):** uma escrita imediata (ALU, link)
+  pela instrução do delay slot no mesmo registrador prevalece e descarta a carga; duas cargas
+  seguidas no mesmo registrador NÃO se cancelam — a primeira se completa ao fim da segunda.
+- **Implementação:** carga "entrante" (da instrução anterior) aplicada ao fim do passo atual,
+  e carga "pendente" (desta instrução) aplicada ao fim do próximo.
+
+## D-020 — BcondZ com `rt` não documentado ⚠️
+- Bit 0 de `rt` decide BLTZ/BGEZ; link só quando `rt AND 1Eh = 10h` (10h/11h).
+
+## D-021 — Desvio em delay slot ⚠️
+- Sem tratamento especial: o resultado emerge do modelo (o alvo do primeiro desvio executa
+  como delay slot do segundo). Coberto por teste para tornar visível qualquer mudança futura.
+
+## D-022 — MTHI/MTLO durante MULT/DIV ⚠️
+- O resultado de MULT/DIV é calculado na emissão; o atraso só afeta MFHI/MFLO (bloqueio).
+  MTHI/MTLO gravam imediatamente. A observação do psx-spx de "não tocar HI/LO por ~2 ciclos"
+  não é modelada.
+
+## D-023 — Exceções na Fase 3: detecção sem despacho
+- Todas as exceções das instruções sem coprocessador são detectadas com EPC, BD, BT, TAR e
+  BadVaddr corretos (`ExceptionRecord`), mas a CPU **para** na instrução causadora em vez de
+  desviar ao vetor: SR/CAUSE/EPC no COP0, vetores e RFE são a Fase 4.
+- Instruções de coprocessador (COP0–3, LWCn, SWCn) param como "não implementadas", citando a
+  fase (4 ou 9), e não consomem ciclo. GPRs, HI e LO começam zerados no reset (⚠️ não documentado).
+
+## D-024 — Modelo de ciclos provisório e SWL/SWR em E/S
+- Ciclos = 1 por instrução + bloqueio de MFHI/MFLO conforme a latência documentada.
+  Tempos de acesso à memória, I-cache e fila de escrita entram na Fase 5 (e 4, para a cache).
+- SWL/SWR parciais viram escritas de byte (correto para RAM; ⚠️ em E/S o resultado é
+  desconhecido segundo o psx-spx).
+
 ## D-010 — MSVC como compilador de referência
 - **Decisão:** Visual Studio 2022 (MSVC 19.44) é o compilador verificado. O código evita
   extensões específicas, mas nenhum outro compilador foi testado ainda (o MinGW disponível na

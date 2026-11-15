@@ -150,25 +150,57 @@ void Application::configure_logging(const CommandLine& cl) {
 
 void Application::initialize_hardware() {
     bus_ = std::make_unique<bus::Bus>();
+    cpu_ = std::make_unique<cpu::Cpu>(*bus_);
     log::info(Category::Bus,
               "Barramento pronto: RAM 2 MiB, scratchpad 1 KiB, BIOS ROM 512 KiB, Memory Control");
 
-    if (settings_.bios_path.empty()) {
-        log::info(Category::Bios, "Nenhuma BIOS configurada ([BIOS] path).");
-    } else {
-        const auto path = resolve_path(config_path_.parent_path(), settings_.bios_path);
-        if (auto loaded = bus_->bios().load_file(path); !loaded) {
-            log::error(Category::Bios, "BIOS não carregada: {}", loaded.error().describe());
-        } else {
-            log::info(Category::Bios, "BIOS mapeada em BFC00000h; primeira instrução: {:08X}h",
-                      bus_->fetch_instruction(0xBFC00000).value);
-        }
-    }
-
-    // Honestidade sobre o estado: a BIOS é apenas mapeada, nunca executada nesta fase.
+    // Honestidade sobre o estado: a CPU existe, mas sem COP0, GTE e periféricos.
     log::warn(Category::Core,
-              "Fase 2: memória e barramento emulados; CPU, GPU, SPU, CD-ROM e demais "
-              "periféricos ainda não existem. Nada é executado.");
+              "Fase 3: CPU R3000A (interpretador) emulada, sem COP0/exceções (Fase 4) e sem GTE; "
+              "GPU, SPU, CD-ROM e demais periféricos ainda não existem.");
+
+    if (settings_.bios_path.empty()) {
+        log::info(Category::Bios, "Nenhuma BIOS configurada ([BIOS] path); a CPU não será executada.");
+        return;
+    }
+    const auto path = resolve_path(config_path_.parent_path(), settings_.bios_path);
+    if (auto loaded = bus_->bios().load_file(path); !loaded) {
+        log::error(Category::Bios, "BIOS não carregada: {}", loaded.error().describe());
+        return;
+    }
+    log::info(Category::Bios, "BIOS mapeada em BFC00000h; primeira instrução: {:08X}h",
+              bus_->fetch_instruction(0xBFC00000).value);
+    run_bios_until_stop();
+}
+
+void Application::run_bios_until_stop() {
+    // Executa a BIOS real do usuário até a primeira instrução que dependa de um componente
+    // ainda inexistente. Nada é simulado: o resultado reflete exatamente o que foi emulado.
+    constexpr u64 limit = 50'000'000;
+    const auto start = std::chrono::steady_clock::now();
+    const u64 executed = cpu_->run(limit);
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - start)
+                        .count();
+    log::info(Category::Cpu, "CPU executou {} instruções da BIOS ({} ciclos, {} ms).", executed,
+              cpu_->cycles(), ms);
+
+    if (const auto& unimpl = cpu_->last_unimplemented(); cpu_->halted() && unimpl) {
+        log::warn(Category::Cpu,
+                  "Execução interrompida em {:08X}h: a instrução requer a Fase {}. "
+                  "É o limite atual da emulação, não um erro da BIOS.",
+                  unimpl->instruction_address, unimpl->phase);
+    } else if (const auto& ex = cpu_->last_exception(); cpu_->halted() && ex) {
+        log::warn(Category::Cpu,
+                  "Exceção {} em {:08X}h (EPC {:08X}h). O despacho de exceções é a Fase 4.",
+                  cpu::to_string(ex->code), ex->instruction_address, ex->epc);
+    } else {
+        log::info(Category::Cpu, "Limite de {} instruções atingido; PC = {:08X}h.", limit,
+                  cpu_->pc());
+    }
+    if (const auto post = bus_->post_code()) {
+        log::info(Category::Bios, "Último código POST: {:X}h", *post);
+    }
 }
 
 ExitCode Application::run_window_loop(const CommandLine& cl) {

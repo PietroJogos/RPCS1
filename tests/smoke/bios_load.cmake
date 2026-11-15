@@ -1,17 +1,23 @@
-# Carregamento de BIOS pela configuração, usando arquivos SINTÉTICOS
-# (512 KiB de 'A'; não é uma BIOS real). Verifica que:
-#  1. um arquivo de 512 KiB é carregado e mapeado em BFC00000h;
-#  2. um arquivo de tamanho errado é rejeitado com mensagem clara;
-#  3. em nenhum caso algo é executado (o programa encerra normalmente).
-if(NOT DEFINED RPCS1_EXE OR NOT DEFINED WORK_DIR)
-    message(FATAL_ERROR "RPCS1_EXE e WORK_DIR são obrigatórios")
+# Carregamento e execução de BIOS pela configuração, usando arquivos SINTÉTICOS
+# (nenhuma BIOS real). Verifica que:
+#  1. uma BIOS sintética com programa MIPS é executada pela CPU emulada até o primeiro
+#     MFC0 (limite da Fase 3), escrevendo o código POST 7;
+#  2. 512 KiB de bytes 41h param na primeira instrução (41414141h é um opcode COP0);
+#  3. arquivos de tamanho errado ou ausentes são rejeitados com mensagem clara;
+#  4. em todos os casos o programa encerra normalmente.
+if(NOT DEFINED RPCS1_EXE OR NOT DEFINED MAKE_BIOS OR NOT DEFINED WORK_DIR)
+    message(FATAL_ERROR "RPCS1_EXE, MAKE_BIOS e WORK_DIR são obrigatórios")
 endif()
 
 file(REMOVE_RECURSE "${WORK_DIR}")
 file(MAKE_DIRECTORY "${WORK_DIR}")
 
+execute_process(COMMAND "${MAKE_BIOS}" "${WORK_DIR}/programa.bin" RESULT_VARIABLE code)
+if(NOT code EQUAL 0)
+    message(FATAL_ERROR "falha ao gerar BIOS sintética (código ${code})")
+endif()
 string(REPEAT "A" 524288 rom)
-file(WRITE "${WORK_DIR}/sintetica.bin" "${rom}")
+file(WRITE "${WORK_DIR}/letras.bin" "${rom}")
 file(WRITE "${WORK_DIR}/pequena.bin" "ABC")
 
 function(run_with_bios bios_file out_var code_var)
@@ -32,18 +38,28 @@ function(expect_contains text needle)
     endif()
 endfunction()
 
-run_with_bios("sintetica.bin" out code)
-if(NOT code EQUAL 0)
-    message(FATAL_ERROR "BIOS válida: código ${code}\n${out}")
-endif()
+function(expect_exit_zero code text)
+    if(NOT code EQUAL 0)
+        message(FATAL_ERROR "código de saída ${code}:\n${text}")
+    endif()
+endfunction()
+
+run_with_bios("programa.bin" out code)
+expect_exit_zero("${code}" "${out}")
 expect_contains("${out}" "BIOS carregada")
+expect_contains("${out}" "CPU executou 305 instruções da BIOS (305 ciclos")
+expect_contains("${out}" "POST (1F802041h) = 7h")
+expect_contains("${out}" "mfc0")
+expect_contains("${out}" "requer a Fase 4")
+
+run_with_bios("letras.bin" out code)
+expect_exit_zero("${code}" "${out}")
 expect_contains("${out}" "primeira instrução: 41414141h")
-expect_contains("${out}" "Nada é executado")
+expect_contains("${out}" "CPU executou 0 instruções")
+expect_contains("${out}" "requer a Fase 4")
 
 run_with_bios("pequena.bin" out code)
-if(NOT code EQUAL 0)
-    message(FATAL_ERROR "BIOS inválida: código ${code}\n${out}")
-endif()
+expect_exit_zero("${code}" "${out}")
 expect_contains("${out}" "BIOS não carregada")
 expect_contains("${out}" "524288 bytes")
 
@@ -51,4 +67,4 @@ run_with_bios("nao_existe.bin" out code)
 expect_contains("${out}" "BIOS não carregada")
 expect_contains("${out}" "não encontrado")
 
-message(STATUS "carregamento de BIOS sintética verificado")
+message(STATUS "carregamento e execução de BIOS sintética verificados")

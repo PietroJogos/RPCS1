@@ -93,8 +93,37 @@ a página de especificações da CPU não o cita explicitamente.
 - Acessos de 16/32 bits desalinhados geram exceção de endereço (AdEL/AdES); `LWL/LWR/SWL/SWR`
   existem para acessos desalinhados intencionais.
 - `ADD`, `ADDI` e `SUB` geram exceção de *overflow*; `ADDU/ADDIU/SUBU` não.
-- Multiplicação e divisão escrevem em `HI/LO` com latência; ler `HI/LO` antes do fim
-  bloqueia a CPU. ⚠️ Latências exatas por operando ainda serão levantadas na Fase 3.
+- Multiplicação e divisão escrevem em `HI/LO` com latência; ler `HI/LO` (MFHI/MFLO) antes
+  do fim bloqueia a CPU até o resultado ficar pronto. Iniciar a operação custa 1 ciclo.
+
+| Operação | Latência (ciclos) | Depende de |
+|---|---|---|
+| MULTU | 6 se `rs` < 800h; 9 se < 100000h; 13 nos demais | Apenas `rs` |
+| MULT | 6 se `rs` em −800h..7FFh; 9 se em −100000h..FFFFFh; 13 nos demais | Apenas `rs` |
+| DIV / DIVU | 36 | — |
+
+- Divisão não gera exceção. DIVU por zero: HI = rs, LO = FFFFFFFFh. DIV por zero: HI = rs,
+  LO = −1 se rs ≥ 0, +1 se rs < 0. DIV `80000000h / −1`: HI = 0, LO = 80000000h.
+- **Load delay:** o valor carregado não é visto pela instrução seguinte; se uma exceção
+  ocorre logo depois, a carga se completa mesmo assim. `LWL`/`LWR` podem ser encadeadas no
+  mesmo registrador sem instrução intermediária (a segunda vê o resultado da primeira).
+  Leituras de COP0/COP2 (`MFC0`, `MFC2`, `CFC2`) também têm 1 instrução de atraso.
+- **BcondZ (opcode 01h):** `rt` = 00h BLTZ, 01h BGEZ, 10h BLTZAL, 11h BGEZAL. As variantes com
+  link gravam `r31 = PC + 8` mesmo sem desvio; se `rs = r31`, a comparação usa o valor anterior.
+- Alvo de desvio = endereço do desvio + 4 + offset×4; `J/JAL` = (PC AND F0000000h) + imm26×4.
+  Salto para alvo desalinhado: o salto executa e a busca seguinte gera AdEL, com EPC = BadVaddr = alvo.
+- Opcodes reservados (exceção RI): primários 14h–1Fh, 27h, 2Ch, 2Dh, 2Fh, 34h–37h, 3Ch–3Fh;
+  SPECIAL 01h, 05h, 0Ah, 0Bh, 0Eh, 0Fh, 14h–17h, 1Ch–1Fh, 28h, 29h, 2Ch–3Fh. Bits não usados
+  dos campos não geram exceção.
+- `ADD`, `ADDI`, `SUB` com overflow não alteram o destino. Em `SB`/`SH` os 32 bits do
+  registrador vão para o barramento.
+- `LWL`/`LWR`/`SWL`/`SWR` (deslocamento 0..3 na palavra): LWR/SWR em +0 transferem os 32 bits;
+  em +1, +2, +3 os 24, 16, 8 bits baixos do registrador ↔ bytes 1..3, 2..3, 3. LWL/SWL em +0,
+  +1, +2 transferem os 8, 16, 24 bits altos ↔ bytes 0, 0..1, 0..2; em +3, os 32 bits.
+- Fila de escrita de 4 palavras: stores custam 1 ciclo, salvo fila cheia; qualquer acesso a
+  KSEG1 espera a fila esvaziar. A RAM principal tem tempo de acesso de ~6 ciclos.
+- ⚠️ A tabela geral de ciclos por instrução e os custos de acerto/falha da I-cache não são
+  documentados pelo psx-spx.
 - **I-cache:** 4096 bytes, mapeamento direto, 256 linhas de 16 bytes; ativa apenas
   para execução em KUSEG e KSEG0.
 - **Sem D-cache:** a memória de cache de dados é exposta como *scratchpad* de 1 KiB em
@@ -1010,8 +1039,15 @@ Requisitos para considerar o recurso implementado:
 | 16 | Banco /RAS1 habilitado sem chips; endereços não documentados de FFFE0000h–FFFE01FFh | 2 ⚠️ adotado: lê 0 |
 | 17 | Conflito: `1F801E80h` (SPU) "lê FFh" × regra geral de lacunas com erro de barramento | 11 |
 | 18 | Como habilitar o espelho da BIOS nos últimos 4 MiB (adotado: janela > 512 KiB espelha) | 15 |
+| 19 | Duas cargas seguidas no mesmo registrador; escrita no load delay slot | 3 ⚠️ derivado do pipeline |
+| 20 | Valores de `rt` em BcondZ além de 00h/01h/10h/11h | 3 ⚠️ adotado: bit 0 decide, sem link |
+| 21 | Desvio dentro de delay slot | 3 ⚠️ resultado do modelo de pipeline |
+| 22 | MTHI/MTLO durante MULT/DIV em andamento; "não tocar HI/LO por ~2 ciclos" | 3 ⚠️ |
+| 23 | Valores de GPR, HI e LO após o reset | 3 ⚠️ adotado: zero |
+| 24 | Comportamento de COP1/COP3, LWC0/1/3 e SWC0/1/3 | 4 |
+| 25 | Ciclos por instrução, custo da I-cache e de buscas sem cache | 4, 5 |
 
-As escolhas marcadas como "adotado" estão justificadas em `docs/DECISIONS.md` (D-012 a D-017)
+As escolhas marcadas como "adotado" estão justificadas em `docs/DECISIONS.md` (D-012 a D-024)
 e cobertas por testes, para que qualquer correção futura fique visível como mudança de teste.
 
 Itens de 1 a 9 serão resolvidos com programas de teste próprios e/ou suítes de teste públicas
