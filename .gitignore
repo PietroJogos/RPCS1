@@ -1,0 +1,25 @@
+# Saidas de build
+/build/
+/out/
+/.vs/
+/.vscode/*
+!/.vscode/extensions.json
+CMakeUserPresets.json
+compile_commands.json
+
+# Arquivos gerados em tempo de execucao
+*.log
+rpcs1.ini
+
+# Arquivos protegidos ou do usuario: NUNCA versionar
+*.bin
+*.rom
+*.cue
+*.iso
+*.img
+*.chd
+*.mcr
+*.mcd
+*.srm
+# Pasta local sugerida para a BIOS do usuario (somente na raiz; src/bios/ e codigo-fonte)
+/bios/
