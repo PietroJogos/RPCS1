@@ -149,15 +149,16 @@ void Application::configure_logging(const CommandLine& cl) {
 }
 
 void Application::initialize_hardware(const CommandLine& cl) {
-    console_ = std::make_unique<system::Console>();
+    console_ = std::make_unique<system::Console>(model_info(settings_.model).region);
     log::info(Category::Bus,
               "Console pronto: RAM 2 MiB, scratchpad 1 KiB, BIOS ROM 512 KiB, Memory Control, "
-              "CPU R3000A com COP0 e I-cache, controlador de interrupções");
+              "CPU R3000A com COP0 e I-cache, interrupções, timers e temporização de vídeo ({})",
+              to_string(console_->region()));
 
     // Honestidade sobre o estado: só a CPU e o núcleo do sistema existem.
     log::warn(Category::Core,
-              "Fase 4: CPU com COP0, exceções, interrupções e I-cache emulados; sem GTE (Fase 9). "
-              "GPU, SPU, CD-ROM, DMA, timers e demais periféricos ainda não existem.");
+              "Fase 5: CPU, COP0, interrupções, timers e temporização de vídeo (VBLANK) emulados; "
+              "sem GTE (Fase 9). GPU (desenho), SPU, CD-ROM, DMA e demais periféricos ainda não existem.");
 
     if (settings_.bios_path.empty()) {
         log::info(Category::Bios, "Nenhuma BIOS configurada ([BIOS] path); a CPU não será executada.");
@@ -178,13 +179,16 @@ void Application::run_bios_until_stop(u64 limit) {
     // ainda inexistente. Nada é simulado: o resultado reflete exatamente o que foi emulado.
     cpu::Cpu& cpu = console_->cpu();
     const auto start = std::chrono::steady_clock::now();
-    const u64 executed = cpu.run(limit);
+    const u64 executed = console_->run(limit);
     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::steady_clock::now() - start)
                         .count();
     log::info(Category::Cpu,
               "CPU executou {} instruções da BIOS ({} ciclos, {} exceções/interrupções, {} ms).",
               executed, cpu.cycles(), cpu.exceptions_taken(), ms);
+    log::info(Category::Video, "Tempo emulado: {:.3f} s ({} quadros de vídeo, {} VBLANKs).",
+              static_cast<double>(cpu.cycles()) / static_cast<double>(system::cpu_clock_hz),
+              console_->video().frames(), console_->video().vblank_starts());
 
     if (const auto& unimpl = cpu.last_unimplemented(); cpu.halted() && unimpl) {
         log::warn(Category::Cpu,

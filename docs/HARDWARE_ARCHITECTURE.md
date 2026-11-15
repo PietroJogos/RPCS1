@@ -466,6 +466,24 @@ Três contadores de 16 bits; cada um tem `COUNT` (`+0`), `MODE` (`+4`) e `TARGET
 | 1 | Sistema ou hblank | Mesmos quatro modos, com vblank |
 | 2 | Sistema ou sistema/8 | Modos 0/3 param o contador; 1/2 contam livremente |
 
+### 9.1 Comportamento medido (SCPH-5501, psx.wiki — "Root Counter Behavior/Mode Combinations")
+
+- **Reset no alvo** com clock do sistema: período = alvo + 2 ciclos (o 0 aparece por dois ciclos).
+  Alvo 0 com reset: contador preso em 0, flag 11 ligado, sem IRQ. Escrever MODE mantém 0 por 2 ciclos.
+- **Escrita em MODE:** preserva os bits 0–9, liga o bit 10, zera bits 11–15 e o contador, rearma o
+  modo "uma vez". Escrever COUNT também rearma; escrever no contador o valor do alvo liga o flag 11.
+- **Flags 11/12:** ligados com ou sem reset; limpos por leitura de MODE de 16/32 bits ou do byte
+  alto; leituras do byte baixo de MODE, de COUNT ou de TARGET não os limpam.
+- **IRQ:** pulso-repetido = todo evento; pulso-uma vez = só o primeiro; alternância-repetido = um a
+  cada dois eventos; alternância-uma vez = só o primeiro (bit 10 fica em 0). Alvo + FFFFh em modo
+  repetido: ambos geram IRQ. Escrever 0 no bit 10 não tem efeito.
+- **Contagem de 140 000 ciclos** (timer 2, alvo 0100h): modo 0010h → 1 IRQ; 0050h → 3; 0058h → 542;
+  0020h → 1 (em FFFFh).
+- **Dotclock** reinicia a cada linha: 341, 426, 487, 682, 853 pontos por linha (256…640).
+- **Sincronização** (inferência a partir das medições, D-032): reset (modos 1/2) e liberação
+  (modo 3) acontecem no **fim** do blank.
+- Leituras de COUNT com dotclock/hblank podem ser instáveis (relógios não sincronizados).
+
 ---
 
 ## 10. GPU
@@ -591,8 +609,18 @@ Comandos de ambiente:
 | Taxa de quadros resultante (progressivo / entrelaçado) | ≈ 59,826 Hz / 59,940 Hz | ≈ 49,761 Hz / 50,000 Hz |
 
 ⚠️ O psx-spx também descreve o clock de vídeo como CPU × 11/7 = 53,222400 MHz (valor usado
-em modelos PAL/PSone), o que diverge do valor nominal PAL acima. A Fase 5/7 deve decidir o
-modelo de clock por região e documentar a escolha.
+em modelos PAL/PSone), o que diverge do valor nominal PAL acima.
+
+**Resolvido na Fase 5 (NTSC):** medições em um SCPH-5501 (psx.wiki, "Display Timing") dão IRQ0 a
+cada ≈566 140 ciclos da CPU (±200) e ≈2152,8 ciclos por linha, o que confere com 263 × 3413 ciclos
+no cristal de 53,693175 MHz (566 204) e não com CPU × 11/7. Cada console usa o cristal da sua
+região, independentemente do modo NTSC/PAL programado. Para PAL não há medição em console PAL.
+
+**Definição de HBLANK/VBLANK (medida):** o HBLANK é a parte da linha fora do intervalo X1..X2 de
+GP1(06h); o VBLANK começa na linha Y2 e termina na linha Y1 de GP1(07h) (23 linhas com 16/256). O
+período do IRQ0 não muda com Y1/Y2; Y2 fora do quadro, Y1 = Y2 ou 0/263 suprimem o IRQ0. Entrelaçado:
+campos de 262/263 linhas (NTSC) e 312/313 (modo PAL). Após GP1(00h): X = 200h..C00h, Y = 10h..100h,
+256 pontos, NTSC, sem entrelaçamento.
 
 | Largura | Divisor do dotclock |
 |---|---|
@@ -1055,7 +1083,7 @@ Requisitos para considerar o recurso implementado:
 
 | # | Item | Fase |
 |---|---|---|
-| 1 | Clock de vídeo PAL: 53,203425 MHz (nominal) × 53,222400 MHz (CPU × 11/7) | 5, 7 |
+| 1 | Clock de vídeo PAL: 53,203425 MHz (nominal) × 53,222400 MHz (CPU × 11/7) — NTSC resolvido por medição; PAL sem medição | 5 ✓ NTSC / ⚠️ PAL |
 | 2 | Latências de MULT/DIV por tamanho de operando e penalidades de acesso por região | 3, 5 |
 | 3 | Ciclos de LZCS/LZCR e dependências de leitura da GTE durante comandos | 9 |
 | 4 | Tabela de coeficientes dos 5 filtros ADPCM da SPU | 11 |
@@ -1086,8 +1114,12 @@ Requisitos para considerar o recurso implementado:
 | 29 | Modos LOCK/INV do BCC; I-cache com IS1 = 0; stores de 8/16 bits na cache isolada | 4 ⚠️ |
 | 30 | Disparo de breakpoints de hardware (conflito TR × "sempre salta") | 23 |
 | 31 | Bits 16–31 de I_STAT/I_MASK ("lixo") | 4 ⚠️ adotado: zero |
+| 32 | Posição exata dos eventos dentro da linha (ordem HSYNC × bordas, fase do dotclock e do /8) | 5 ⚠️ |
+| 33 | Timer 1 em HBLANK pausado no VBLANK: medido 239/quadro, modelo 240; sysclock reset no VBLANK lido no IRQ0: medido 55 425–57 886, modelo 57 937 | 5 ⚠️ calibração pendente |
+| 34 | Tempos de acesso à memória, I-cache e fila de escrita (fórmulas incompletas no psx-spx) | 20 |
+| 35 | Taxa PAL citada pelo psx-spx (49,761 Hz) × 49,747 Hz calculados com os mesmos valores | 5 ⚠️ |
 
-As escolhas marcadas como "adotado" estão justificadas em `docs/DECISIONS.md` (D-012 a D-030)
+As escolhas marcadas como "adotado" estão justificadas em `docs/DECISIONS.md` (D-012 a D-035)
 e cobertas por testes, para que qualquer correção futura fique visível como mudança de teste.
 
 Itens de 1 a 9 serão resolvidos com programas de teste próprios e/ou suítes de teste públicas
@@ -1125,5 +1157,9 @@ código-fonte; as implementações são escritas a partir da compreensão do com
 validadas por testes próprios. A licença de reprodução do texto do psx-spx ainda deve ser
 verificada antes de citar trechos literais (ver `docs/REFERENCES.md`).
 
-O psx.wiki (<https://psx.wiki/>) foi indicado como fonte complementar, mas ainda não foi
-consultado; será usado para conferência cruzada nas fases correspondentes.
+psx.wiki (<https://psx.wiki/>), consultado na Fase 5: páginas de hardware
+(<https://psx.wiki/hardware/timers/>, <https://psx.wiki/hardware/gpu/gpustat/>,
+<https://psx.wiki/hardware/gpu/video-timing/>) e resultados de testes executados em um SCPH-5501
+(<https://psx.wiki/tests/display-timing/>, <https://psx.wiki/tests/timers2/>,
+<https://psx.wiki/tests/timers3/>, <https://psx.wiki/tests/timers-ps1-tests/>). Só os números
+medidos e as descrições de comportamento foram usados; nenhum código de teste foi copiado.

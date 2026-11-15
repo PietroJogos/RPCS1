@@ -12,8 +12,8 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
 | 2 | Memória e barramento | **concluída** | 38 testes novos; 7 comportamentos não documentados adotados e marcados ⚠️ (D-012 a D-017) |
 | 3 | CPU R3000A | **concluída** | Interpretador sem coprocessadores; 56 testes novos; exceções detectadas (despacho na Fase 4) |
 | 4 | COP0, exceções, cache | **concluída** | COP0, despacho de exceções, interrupções, I-cache, isolamento e controlador I_STAT/I_MASK; 36 testes novos |
-| 5 | Scheduler e timers | não iniciada | Próxima fase; decisão pendente sobre clock de vídeo PAL |
-| 6 | DMA | não iniciada | |
+| 5 | Scheduler e timers | **concluída** | Scheduler, temporização de vídeo (IRQ0) e timers validados contra medições do SCPH-5501; 31 testes novos; 2 divergências de 1 linha registradas (D-033); tempos de memória movidos para a Fase 20 |
+| 6 | DMA | não iniciada | Próxima fase |
 | 7 | GPU: registradores e VRAM | não iniciada | |
 | 8 | GPU: renderização | não iniciada | |
 | 9 | GTE | não iniciada | |
@@ -109,16 +109,33 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
 - **`system::Console`** interliga barramento, controlador e CPU; o frontend o utiliza.
 - **CLI:** `--cpu-steps <n>` limita a execução da BIOS.
 
+## Fase 5 — o que foi realmente implementado
+
+- **Base de tempo única** (`src/system/clock.hpp`): ciclos da CPU a 33,8688 MHz; conversão inteira
+  exata para o cristal de vídeo da região (53,693175 / 53,203425 MHz), sem deriva.
+- **Scheduler** (`src/system/scheduler.*`): um evento por componente, despachado em ordem de tempo
+  antes de cada instrução pelo `Console::run`.
+- **Temporização de vídeo** (`src/gpu/video_timing.*`): linhas de 3413/3406 ciclos, quadros de
+  263/314 linhas (entrelaçado 262/263 e 312/313), HBLANK pelo intervalo X de GP1(06h), VBLANK de Y2
+  a Y1 de GP1(07h) com **IRQ0**, dotclock por linha, valores de GP1(00h) no reset.
+- **Timers 0–2** (`src/timers/timers.*`): fontes sistema/dotclock/HBLANK/÷8, alvo e FFFFh, reset no
+  alvo com período alvo + 2, IRQ em pulso/alternância, uma vez/repetido, flags 11/12 com as regras
+  de leitura medidas, sincronização com HBLANK/VBLANK, IRQ4/5/6.
+- **Validação contra medições** do SCPH-5501 (psx.wiki): período do quadro, linhas, HBLANKs por
+  quadro, pontos por linha e por quadro, VBLANK de 23 linhas, casos de Y1/Y2 sem IRQ0, número de
+  IRQs por modo, parte visível da linha.
+- **Frontend:** a BIOS roda pelo `Console::run` (eventos de vídeo e timers); o log informa tempo
+  emulado, quadros e VBLANKs.
+
 ## Recursos ausentes (conscientemente)
 
-- GTE (COP2): uma BIOS real deve chegar mais longe agora, mas para no primeiro comando COP2 ou
-  fica presa esperando periféricos inexistentes (timers, DMA, GPU, CD-ROM...).
+- GTE (COP2); GPU (comandos, VRAM, GPUSTAT), SPU, CD-ROM, DMA, SIO, controles, Memory Cards.
+- Tempos de acesso à memória, I-cache e fila de escrita (movidos para a Fase 20, D-034).
+- Calibração fina de 1 linha nos timers sincronizados ao VBLANK (D-033).
 - Disparo de breakpoints de hardware (Fase 23); modos LOCK/INV do BCC.
-- Temporização de memória, da I-cache e da fila de escrita (Fase 5).
-- GPU, SPU, CD-ROM, DMA, timers, SIO, controles, Memory Cards.
 
 ## Próxima dependência técnica
 
-**Fase 5 — scheduler e timers:** agendador de eventos por ciclo, timers 0–2, VBLANK/HBLANK por
-região (IRQ0 no controlador já existente) e tempos de acesso à memória. É a base de tempo que a
-BIOS e todos os periféricos usam.
+**Fase 6 — DMA:** os 7 canais (burst, slice, linked list), DPCR/DICR e IRQ3. É o caminho pelo
+qual a BIOS e os jogos alimentam GPU, CD-ROM, SPU e MDEC, e já pode ser testado com o barramento,
+o scheduler e o controlador de interrupções existentes.

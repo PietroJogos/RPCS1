@@ -39,10 +39,13 @@ add_library(rpcs1_hw STATIC
     cpu/cpu.cpp
     cpu/disassembler.cpp
     cpu/icache.cpp
+    gpu/video_timing.cpp
     interrupts/interrupt_controller.cpp
     memory/bios_rom.cpp
     memory/memory_control.cpp
-    system/console.cpp)
+    system/console.cpp
+    system/scheduler.cpp
+    timers/timers.cpp)
 target_link_libraries(rpcs1_hw PUBLIC rpcs1_core)
 rpcs1_configure_target(rpcs1_hw)
 

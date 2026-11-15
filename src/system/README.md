@@ -1,7 +1,9 @@
 # Módulo `system`
 
-**Estado: implementado (Fase 4).**
+**Estado: implementado (Fases 4 e 5).**
 
-`console.hpp` — o console emulado: possui o barramento, o controlador de interrupções e a CPU,
-liga o controlador ao barramento (1F801070h) e à linha de interrupção da CPU, e oferece
-`power_on()`, `reset()` e `load_bios()`. Cada novo componente será integrado aqui.
+- `console.hpp` — o console emulado: possui barramento, controlador de interrupções, CPU, scheduler,
+  temporização de vídeo e timers; liga os dispositivos ao barramento e oferece `power_on()`,
+  `reset()`, `load_bios()` e `run()` (despacha eventos antes de cada instrução).
+- `scheduler.hpp` — eventos por ciclo da CPU, um por componente.
+- `clock.hpp` — base de tempo (33,8688 MHz) e conversão exata para os cristais de vídeo.

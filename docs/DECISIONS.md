@@ -166,6 +166,39 @@ acrescentadas no fim; decisões revistas são marcadas como substituídas, não 
 - BPC/BDA/BDAM/BPCM/DCIC são armazenados com as máscaras documentadas, mas não disparam: o
   psx-spx é contraditório sobre o bit TR, e o uso principal é depuração (Fase 23).
 
+## D-031 — Modelo da temporização de vídeo (Fase 5)
+- **Medido e implementado:** cristal por região do console; 3413/3406 ciclos de vídeo por linha
+  conforme o modo; 263/314 linhas (entrelaçado 263/262 e 313/312); HBLANK fora de X1..X2; VBLANK de
+  Y2 a Y1 com IRQ0 no início; dotclock reiniciado a cada linha; conversão inteira exata CPU ↔ vídeo.
+- **Escolhas ⚠️:** HSYNC processado antes das bordas na mesma posição; dotclock com ticks em
+  x = k × divisor; campo longo primeiro no entrelaçado; novos parâmetros de GP1 aplicados no próximo
+  HSYNC (o dotclock recomeça ali); com Y1 = Y2 o término prevalece; VBLANK/HBLANK continuam com a
+  exibição desligada (desconhecido no psx-spx).
+
+## D-032 — Sincronização dos timers no fim do blank (inferido)
+- O psx-spx diz apenas "zerar no blank". As medições do psx.wiki (timer 0 em sincronização 1 lido
+  no início do HBLANK ≈ duração da parte visível; timer 1 em sysclock sincronização 1 lido no IRQ0 ≈
+  tempo visível mod 65 536; sincronização 2 contando a partir do VBLANK e lendo 0 depois dele)
+  só são consistentes com reset/liberação no **fim** do blank. Adotado para os modos 1, 2 e 3.
+
+## D-033 — Divergências conhecidas em relação às medições
+- Timer 1 (HBLANK) pausado no VBLANK: medido 239 por quadro; o modelo dá 240 (Y2 − Y1).
+- Timer 1 (sistema) com reset no VBLANK lido no IRQ0: medido 55 425–57 886; o modelo dá 57 937.
+- Origem provável: posição do VBLANK dos timers dentro da linha, ou custo das instruções de leitura
+  no hardware (o RPCS1 ainda conta 1 ciclo por instrução). Os testes registram o valor do modelo e
+  citam o medido; a calibração exige analisar os registros brutos dos testes (não lidos ainda).
+
+## D-034 — Tempos de acesso à memória adiados
+- O psx-spx não dá as fórmulas completas (BIOS/expansões, I-cache, fila de escrita). Inventar números
+  violaria a regra de não falsificar; a CPU continua com 1 ciclo por instrução + bloqueios de
+  MULT/DIV. A calibração de temporização foi movida para a Fase 20, com testes próprios.
+
+## D-035 — Outras escolhas dos timers ⚠️
+- Bit 8 seleciona a fonte só nos timers 0/1 e bit 9 só no timer 2 (combinações não documentadas).
+- Prescaler /8 em fase com o tempo absoluto; pulso do bit 10 com 2 ciclos; alvo 0 nunca gera IRQ;
+  alvo = FFFFh gera um único IRQ; bits 16–31 lidos como zero; +Ch de cada timer lido como zero;
+  reset no alvo com fontes lentas aplicado no mesmo tick (o hardware reseta 1 ciclo depois).
+
 ## D-010 — MSVC como compilador de referência
 - **Decisão:** Visual Studio 2022 (MSVC 19.44) é o compilador verificado. O código evita
   extensões específicas, mas nenhum outro compilador foi testado ainda (o MinGW disponível na

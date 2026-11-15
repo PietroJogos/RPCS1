@@ -1,5 +1,7 @@
 # Módulo `gpu`
 
-**Estado: não implementado.** Previsto para a(s) Fase(s) 7, 8 — ver `docs/ROADMAP.md`.
+**Estado: temporização de vídeo implementada (Fase 5). GP0/GP1, VRAM e desenho: Fases 7 e 8.**
 
-Escopo: GPU: GP0/GP1, FIFO, VRAM 1024x512, renderizador por software.
+- `video_timing.hpp` — gerador de HSYNC, HBLANK, VBLANK, IRQ0 e dotclock, com o cristal da região
+  do console, os valores de GP1(00h) e os intervalos de GP1(06h)/GP1(07h). A GPU (Fase 7) passará a
+  atualizar esses parâmetros com `set_display_timing`.

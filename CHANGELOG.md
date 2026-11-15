@@ -2,6 +2,20 @@
 
 Formato baseado em "Keep a Changelog". Versões seguem SemVer; antes da 0.1.0 todas são pré-lançamentos.
 
+## [0.0.5] — 15/11/2026 — pré-alfa (Fase 5)
+
+### Adicionado
+- Base de tempo única (ciclos da CPU) com conversão exata para o cristal de vídeo da região.
+- Scheduler de eventos despachados antes de cada instrução.
+- Temporização de vídeo: HSYNC, HBLANK (GP1(06h)), VBLANK (GP1(07h)) e IRQ0; dotclock por linha.
+- Timers 0, 1 e 2 com todas as fontes, alvo/FFFFh, IRQ pulso/alternância, uma vez/repetido,
+  flags e sincronização com HBLANK/VBLANK.
+- Validação contra medições publicadas de um SCPH-5501; 31 testes novos.
+
+### Alterado
+- A BIOS configurada agora roda pelo `Console::run`, com vídeo e timers ativos.
+- Tempos de acesso à memória movidos para a Fase 20 (dados insuficientes).
+
 ## [0.0.4] — 15/11/2026 — pré-alfa (Fase 4)
 
 ### Adicionado

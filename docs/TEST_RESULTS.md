@@ -3,6 +3,51 @@
 Registro dos testes **realmente executados**. Cada entrada indica ambiente, comando e resultado.
 A entrada mais recente fica no topo.
 
+## 15/11/2026 — Fase 5 (versão 0.0.5)
+
+**Ambiente:** o mesmo das fases anteriores; build limpo a partir de pasta vazia, Debug e Release.
+
+### Compilação: Debug e Release sem avisos. CTest: 8/8 em Debug e 8/8 em Release.
+
+### Testes unitários: 222/222 (191 anteriores + 31 novos)
+| Grupo | Casos | O que verifica |
+|---|---|---|
+| `scheduler/`, `clock/` | 3 | Ordem, empates, cancelamento, fonte de tempo; conversão CPU↔vídeo exata por 1 h |
+| `video/` | 8 | Períodos de quadro, linhas, HBLANKs, VBLANK de 23 linhas, PAL, entrelaçado, 9 casos de Y1/Y2, 6 de X1/X2, pontos por linha (5 larguras) e por quadro |
+| `timers/`, `console/` | 20 | Reset, sistema e ÷8, IRQs por modo, sequência do reset no alvo, alvo 0, FFFFh, flags, MODE, COUNT = alvo, uma vez/rearme, pulso, alternância, dotclock, HBLANK, sincronizações (T0, T1, T2, modo 3), CPU lendo timers no Console, laço que conta VBLANKs |
+
+### Comparação com medições em SCPH-5501 (psx.wiki)
+| Grandeza | Medido | RPCS1 | Situação |
+|---|---|---|---|
+| Período do IRQ0 (NTSC progressivo) | ≈566 140 (±200) | 566 203–566 204 | ✅ dentro da tolerância |
+| Campos entrelaçados | ≈566 150 / ≈563 930 | 566 204 / 564 051 | ✅ |
+| Bit PAL num console NTSC | ≈674 450 | 674 613–674 614 | ✅ |
+| HBLANKs por quadro | 263 | 263 | ✅ |
+| VBLANK com Y = 16..256 | 23 linhas | 23 | ✅ |
+| Y2 = 300/1023, Y1 = Y2, 0/263 | sem IRQ0 | sem IRQ0 | ✅ |
+| Pontos por linha (256/320/368/512/640) | 341/426/487/682/853 | idem | ✅ |
+| Pontos por quadro (256 / 320) | 89 687 / 112 043 | 89 683 / 112 038 | ✅ (±10) |
+| IRQs em 140 000 ciclos (0010h/0050h/0058h/0020h) | 1 / 3 / 542 / 1 | 1 / 3 / 542 / 1 | ✅ |
+| Parte visível da linha (X 600..3160) | 1613–1614 | 1614,8 | ✅ |
+| Timer 1 HBLANK pausado no VBLANK | 239 / quadro | 240 | ⚠️ diverge 1 linha (D-033) |
+| Timer 1 sysclock reset no VBLANK, no IRQ0 | 55 425–57 886 | 57 937 | ⚠️ (D-033) |
+
+### Testes de mutação
+- 1ª tentativa **inválida**: a mutação não compilou (aviso C4127 tratado como erro) e os testes
+  rodaram o binário anterior. Refeita com mutação compilável.
+- Reset no alvo sem o "+2" e quadro NTSC com 262 linhas: **8 testes falharam** como esperado;
+  código restaurado, recompilado e 222/222 novamente.
+
+### Problemas encontrados e corrigidos
+1. Dois erros de cálculo nos próprios testes (janela de 11 linhas em vez de 10; espera longa demais
+   no teste de sincronização 3), corrigidos antes da execução.
+2. Expectativa errada no teste do modo PAL (674 617 calculado à mão; o correto é 674 613,4) e
+   contagem de HBLANKs iniciada no instante errado. O código estava certo; os testes foram ajustados.
+
+### Desempenho observado (não é meta)
+Release: 2 milhões de passos (todos com exceção) em 89 ms (~22 milhões/s). O console real executa
+33,9 milhões de ciclos/s; otimização é a Fase 24.
+
 ## 15/11/2026 — Fase 4 (versão 0.0.4)
 
 **Ambiente:** o mesmo das fases anteriores; build limpo a partir de pasta vazia, Debug e Release.

@@ -100,6 +100,8 @@ public:
     [[nodiscard]] bool irq_line() const noexcept { return irq_line_ && irq_line_->irq_asserted(); }
 
     [[nodiscard]] u64 cycles() const noexcept { return cycles_; }
+    // Referência estável ao contador de ciclos: base de tempo do scheduler (Fase 5).
+    [[nodiscard]] const u64& cycle_counter() const noexcept { return cycles_; }
     [[nodiscard]] u64 instructions() const noexcept { return instructions_; }
     [[nodiscard]] u64 exceptions_taken() const noexcept { return exceptions_; }
 

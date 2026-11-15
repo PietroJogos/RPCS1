@@ -63,8 +63,8 @@ O estado atual de cada fase fica em [PROGRESS.md](PROGRESS.md); os resultados de
 ## Fase 5 — Scheduler, timers e sincronização → 4
 - **Objetivos:** agendador de eventos por ciclo (base: clock da CPU), timers 0–2 com todas as fontes
   e modos de sincronização, eventos de HBLANK/VBLANK derivados do clock de vídeo por região
-  (gerando IRQ0 no controlador já existente), tempos de acesso à memória e da I-cache, estado de
-  reset coerente.
+  (gerando IRQ0 no controlador já existente), estado de reset coerente. Os tempos de acesso à
+  memória e da I-cache foram movidos para a Fase 20 por falta de dados documentados (D-034).
 - **Testes:** contagem/alvo/overflow/one-shot/toggle, sincronização com blanks, ordenação de eventos.
 - **Decisão pendente:** modelo de clock de vídeo PAL (ver lacuna nº 1 da documentação).
 
@@ -141,7 +141,8 @@ O estado atual de cada fase fica em [PROGRESS.md](PROGRESS.md); os resultados de
 
 ## Fase 20 — Sincronização vídeo/áudio/CPU → 7, 11
 - **Objetivos:** frame pacing, controle de velocidade, VBLANK, buffers de áudio com tratamento de
-  underrun/overrun, temporização regional, pausa/reset/retomada.
+  underrun/overrun, temporização regional, pausa/reset/retomada; calibração dos tempos de acesso à
+  memória, I-cache e fila de escrita contra medições (D-034) e das divergências da D-033.
 
 ## Fase 21 — Compatibilidade → 16
 - **Objetivos:** suíte de compatibilidade com estados *não testado / falha de boot / menu /

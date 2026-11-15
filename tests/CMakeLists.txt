@@ -26,6 +26,9 @@ add_executable(rpcs1_tests
     memory/test_bios_rom.cpp
     memory/test_memory_block.cpp
     memory/test_memory_control.cpp
+    gpu/test_video_timing.cpp
+    system/test_scheduler.cpp
+    timers/test_timers.cpp
     video/test_framebuffer.cpp)
 target_include_directories(rpcs1_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(rpcs1_tests PRIVATE rpcs1_core rpcs1_hw rpcs1_video)
