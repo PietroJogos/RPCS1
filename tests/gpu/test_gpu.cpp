@@ -289,8 +289,8 @@ TEST_CASE("gpu/comandos de desenho são consumidos sem dessincronizar o FIFO") {
     r.gp0({0x60FFFFFF, 0x00000000, 0x00100010});
     r.gp0({0x020000FF, 0x00000000, 0x00010010});
     CHECK_EQ(r.px(0, 0), u16{31});
-    CHECK_EQ(r.gpu.discarded_draw_commands(), u64{2});
-    CHECK_EQ(r.px(5, 5), u16{0}); // nada foi desenhado
+    CHECK_EQ(r.gpu.primitives_drawn(), u64{2});
+    CHECK_EQ(r.px(5, 5), u16{0}); // fora da área de desenho (0,0)-(0,0)
 }
 
 TEST_CASE("gpu/polilinha termina no marcador 5000_5000h, nunca antes de 2 vértices") {
@@ -304,7 +304,7 @@ TEST_CASE("gpu/polilinha termina no marcador 5000_5000h, nunca antes de 2 vérti
            0x55555555});
     r.gp0({0x02FF0000, 0x00010000, 0x00010010});
     CHECK_EQ(r.px(0, 1), u16{31 << 10});
-    CHECK_EQ(r.gpu.discarded_draw_commands(), u64{2});
+    CHECK_EQ(r.gpu.primitives_drawn(), u64{2});
 }
 
 TEST_CASE("gpu/GP1(01h) esvazia o FIFO; GP1(00h) preserva VRAM e GP1(09h)") {

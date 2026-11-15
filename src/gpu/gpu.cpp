@@ -41,8 +41,7 @@ void Gpu::power_on() {
     vram_.clear();
     vram_2mb_ = false;
     gpuread_latch_ = 0;
-    discarded_draws_ = 0;
-    reported_opcodes_.reset();
+    primitives_ = 0;
     reset_command();
 }
 
@@ -121,8 +120,10 @@ void Gpu::gp0_write(u32 word) {
         if (expected_ == 0) {
             polyline_ = true;
             polyline_gouraud_ = ((word >> 24) & 0x10u) != 0;
+            polyline_semi_ = ((word >> 24) & 0x02u) != 0;
             polyline_words_ = 1;
-            discard_draw(word >> 24);
+            polyline_color_ = word & 0x00FFFFFFu;
+            ++primitives_;
             return;
         }
     }
@@ -143,7 +144,21 @@ void Gpu::feed_polyline(u32 word) {
     if (vertex_start && is_polyline_terminator(word)) {
         polyline_ = false;
         polyline_words_ = 0;
+        return;
     }
+    const bool is_color = polyline_gouraud_ && index >= 2 && (index & 1u) == 0;
+    if (is_color) {
+        polyline_color_ = word & 0x00FFFFFFu;
+        return;
+    }
+    Vertex v;
+    v.x = sign_extend11(word);
+    v.y = sign_extend11(word >> 16);
+    v.color = polyline_color_;
+    if (index > 1) { // a partir do 2º vértice, cada vértice fecha um segmento
+        renderer_.draw_line(draw_env(), polyline_prev_, v, polyline_gouraud_, polyline_semi_);
+    }
+    polyline_prev_ = v;
 }
 
 void Gpu::execute_command() {
@@ -160,9 +175,9 @@ void Gpu::execute_command() {
         }
         // 00h, 01h (limpar cache de textura: sem cache emulado ainda) e 03h–1Eh: sem efeito.
         break;
-    case 1:
-    case 2:
-    case 3: discard_draw(op); break;
+    case 1: draw_polygon(); break;
+    case 2: draw_line(); break;
+    case 3: draw_rectangle(); break;
     case 4: execute_copy(); break;
     case 5: start_upload(); break;
     case 6: start_download(); break;
@@ -170,14 +185,109 @@ void Gpu::execute_command() {
     }
 }
 
-void Gpu::discard_draw(u32 opcode) {
-    ++discarded_draws_;
-    if (!reported_opcodes_.test(opcode & 0xFFu)) {
-        reported_opcodes_.set(opcode & 0xFFu);
-        log::warn(Category::Gpu,
-                  "GP0({:02X}h): comando de desenho ainda não implementado (Fase 8); descartado",
-                  opcode & 0xFFu);
+DrawEnv Gpu::draw_env() const noexcept {
+    DrawEnv env;
+    env.texpage = texpage_;
+    env.texture_window = texture_window_;
+    env.area_top_left = area_top_left_;
+    env.area_bottom_right = area_bottom_right_;
+    env.draw_offset = draw_offset_;
+    env.mask_set = mask_set_;
+    env.mask_check = mask_check_;
+    return env;
+}
+
+void Gpu::draw_polygon() {
+    // Palavras: cor0+comando, [cor] vértice [UV] por vértice (a cor do 1º vem no comando).
+    const u32 op = fifo_[0] >> 24;
+    PrimitiveFlags flags;
+    flags.gouraud = (op & 0x10u) != 0;
+    flags.textured = (op & 0x04u) != 0;
+    flags.raw = (op & 0x01u) != 0;
+    flags.semi = (op & 0x02u) != 0;
+    const u32 count = (op & 0x08u) ? 4 : 3;
+    Vertex v[4];
+    u32 clut = 0;
+    u32 index = 1;
+    for (u32 i = 0; i < count; ++i) {
+        v[i].color = (flags.gouraud && i > 0) ? fifo_[index++] & 0x00FFFFFFu : fifo_[0] & 0x00FFFFFFu;
+        const u32 xy = fifo_[index++];
+        v[i].x = sign_extend11(xy);
+        v[i].y = sign_extend11(xy >> 16);
+        if (flags.textured) {
+            const u32 uv = fifo_[index++];
+            v[i].u = uv & 0xFFu;
+            v[i].v = (uv >> 8) & 0xFFu;
+            if (i == 0) {
+                clut = uv >> 16;
+            } else if (i == 1) {
+                // Página de textura do polígono: bits 0–8 e 11 vão para E1h/GPUSTAT; 9, 10,
+                // 12 e 13 não mudam.
+                texpage_ = (texpage_ & ~0x09FFu) | ((uv >> 16) & 0x09FFu);
+            }
+        }
     }
+    ++primitives_;
+    const DrawEnv env = draw_env();
+    const Vertex first[3] = {v[0], v[1], v[2]};
+    renderer_.draw_triangle(env, first, flags, clut);
+    if (count == 4) {
+        const Vertex second[3] = {v[1], v[2], v[3]};
+        renderer_.draw_triangle(env, second, flags, clut);
+    }
+}
+
+void Gpu::draw_line() {
+    const u32 op = fifo_[0] >> 24;
+    const bool gouraud = (op & 0x10u) != 0;
+    Vertex a;
+    Vertex b;
+    a.color = fifo_[0] & 0x00FFFFFFu;
+    a.x = sign_extend11(fifo_[1]);
+    a.y = sign_extend11(fifo_[1] >> 16);
+    const u32 xy = gouraud ? fifo_[3] : fifo_[2];
+    b.color = gouraud ? fifo_[2] & 0x00FFFFFFu : a.color;
+    b.x = sign_extend11(xy);
+    b.y = sign_extend11(xy >> 16);
+    ++primitives_;
+    renderer_.draw_line(draw_env(), a, b, gouraud, (op & 0x02u) != 0);
+}
+
+void Gpu::draw_rectangle() {
+    // Palavras: cor+comando, vértice superior esquerdo, [CLUT+UV], [tamanho variável].
+    const u32 op = fifo_[0] >> 24;
+    PrimitiveFlags flags;
+    flags.textured = (op & 0x04u) != 0;
+    flags.raw = (op & 0x01u) != 0;
+    flags.semi = (op & 0x02u) != 0;
+    Vertex origin;
+    origin.color = fifo_[0] & 0x00FFFFFFu;
+    origin.x = sign_extend11(fifo_[1]);
+    origin.y = sign_extend11(fifo_[1] >> 16);
+    u32 index = 2;
+    u32 clut = 0;
+    if (flags.textured) {
+        const u32 uv = fifo_[index++];
+        origin.u = uv & 0xFFu;
+        origin.v = (uv >> 8) & 0xFFu;
+        clut = uv >> 16;
+    }
+    u32 width = 0;
+    u32 height = 0;
+    switch ((op >> 3) & 3u) {
+    case 0: {
+        // Tamanho variável: até 1023 × 511 (medido: a largura conta módulo 1024, a altura 512).
+        const u32 size = fifo_[index];
+        width = size & 0x3FFu;
+        height = (size >> 16) & 0x1FFu;
+        break;
+    }
+    case 1: width = height = 1; break;
+    case 2: width = height = 8; break;
+    default: width = height = 16; break;
+    }
+    ++primitives_;
+    renderer_.draw_rectangle(draw_env(), origin, width, height, flags, clut);
 }
 
 void Gpu::write_masked(u32 x, u32 y, u16 value) {

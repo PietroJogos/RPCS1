@@ -674,6 +674,30 @@ centraliza em 88h (NTSC, ±120 linhas) ou A3h (PAL, ±144 linhas).
 - **Exibição de 24 bits:** cada pixel usa 3 bytes consecutivos da linha (R, G, B), a partir de X × 2.
 - Escolhas não documentadas: `docs/DECISIONS.md`, D-040 a D-043.
 
+### 10.8 Regras de renderização implementadas e verificadas na Fase 8
+
+Medições do psx.wiki em SCPH-5501 ("gpu-rasterization", "gpu-primitives") usadas como testes:
+
+| Caso | Medido | RPCS1 |
+|---|---|---|
+| Triângulo 0,0 / 10,0 / 0,10 | pixels com x + y ≤ 9; mesmo resultado nos dois sentidos | idem ✅ |
+| Quadrado dividido em qualquer diagonal ou em leque | cada pixel desenhado uma vez | idem ✅ |
+| Triângulos 0,0/200,0/200,1 · 0,0/0,200/1,200 · 0,0/200,1/200,2 | 200 · 199 · 100 pixels | idem ✅ |
+| Largura 1023 / 1024; altura 511 / 512 (triângulos e linhas) | desenha / nada | idem ✅ |
+| Linha gouraud 00h→FFh em 16 pixels, sem / com dithering | `02468acehjlnprtv` / `02368acfgjknprtv` | idem ✅ |
+| Quadrilátero de 16 pixels, U 0→255 | `00 10 20 30 40 50 60 70 80 8F 9F AF BF CF DF EF` | idem ✅ |
+| Retângulo 62h cor 808080h sobre 0000h/2108h/5EF7h/7FFFh | 2108h/318Ch/4E73h/5EF7h | idem ✅ |
+| Retângulo 67h, texel C210h, mesmos fundos | A108h/B18Ch/CE73h/DEF7h | idem ✅ |
+| Janela E2h máscara 1, deslocamento 1 | `08 … 0F 08 …` | idem ✅ |
+| Polilinha fechada | cantos desenhados 2 vezes | idem ✅ |
+
+- **Matriz de dithering** (linha = y AND 3, coluna = x AND 3), somada à cor de 8 bits antes de
+  saturar e descartar 3 bits: `−4 0 −3 1 / 2 −2 3 −1 / −3 1 −4 0 / 3 −1 2 −2`.
+- **Textura:** 4 bits = 4 índices por halfword (o primeiro nos bits 0–3), 8 bits = 2 (o primeiro
+  nos bits 0–7); CLUT em X = campo × 16, Y = bits 6–14; texel 0000h transparente, 8000h preto
+  opaco; bit 15 do texel controla a semitransparência e é gravado como bit de máscara.
+- Escolhas não documentadas: `docs/DECISIONS.md`, D-044 a D-047.
+
 ---
 
 ## 11. GTE (COP2)
@@ -1132,7 +1156,7 @@ Requisitos para considerar o recurso implementado:
 | 6 | Formato de `42h` em modo normal do controle; tempos de /ACK | 18 |
 | 7 | Atrasos de leitura de Memory Cards Sony | 19 |
 | 8 | Temporização detalhada de DMA (chopping, prioridades, roubo de ciclos da CPU) | 6 |
-| 9 | Regras exatas de rasterização (bordas, precisão de UV, dithering) | 8 |
+| 9 | Regras exatas de rasterização (bordas, precisão de UV, dithering) | 8 ✓ bordas, UV, dithering medidos; ⚠️ precisão da cor gouraud |
 | 10 | Hashes de BIOS para identificação de versão | 15 |
 | 11 | Fearful Harmony: nenhum fato técnico confirmado | 17 |
 | 12 | Valor lido de regiões de expansão sem dispositivo (barramento aberto) | 2 ⚠️ adotado FFh |
@@ -1167,8 +1191,12 @@ Requisitos para considerar o recurso implementado:
 | 41 | Cópia 80h com origem e destino sobrepostos (cópia em blocos) | 8 ⚠️ adotado: pixel a pixel |
 | 42 | Metade alta da última palavra de C0h com total ímpar; GPUREAD com LB/LH | 7 ⚠️ adotado: 0 / avança |
 | 43 | E1h bit 11 armazenado com GP1(09h) = 0? GP1(00h)/GP1(01h) durante C0h | 7 ⚠️ |
+| 44 | Algoritmo exato das linhas (casos de meio passo) e ponto fixo da cor gouraud | 8 ⚠️ D-044/D-045 |
+| 45 | Cache de textura: artefato com U ímpar e espelho que começa em U + 1 | 8 ⚠️ não emulado |
+| 46 | Ordem dithering × semitransparência; fórmula exata da modulação (v0 × v2) | 8 ⚠️ |
+| 47 | E1h bit 10 (desenho na área exibida) em modo entrelaçado; tempo de desenho | 8, 20 |
 
-As escolhas marcadas como "adotado" estão justificadas em `docs/DECISIONS.md` (D-012 a D-043)
+As escolhas marcadas como "adotado" estão justificadas em `docs/DECISIONS.md` (D-012 a D-047)
 e cobertas por testes, para que qualquer correção futura fique visível como mudança de teste.
 
 Itens de 1 a 9 serão resolvidos com programas de teste próprios e/ou suítes de teste públicas

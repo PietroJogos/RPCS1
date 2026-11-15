@@ -10,6 +10,6 @@ inline constexpr const char* string = "@PROJECT_VERSION@";
 inline constexpr const char* product = "RPCS1";
 inline constexpr const char* developer = "PiStudio BR";
 // Estágio honesto do projeto (o que ainda falta para rodar software de PS1).
-inline constexpr const char* stage = "pré-alfa (Fase 7 — GPU: registradores e VRAM; sem desenho de primitivas e sem som)";
+inline constexpr const char* stage = "pré-alfa (Fase 8 — GPU com renderização por software; sem GTE e sem som)";
 
 } // namespace rpcs1::version

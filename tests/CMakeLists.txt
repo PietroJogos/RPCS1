@@ -28,6 +28,7 @@ add_executable(rpcs1_tests
     memory/test_memory_control.cpp
     dma/test_dma.cpp
     gpu/test_gpu.cpp
+    gpu/test_renderer.cpp
     gpu/test_video_timing.cpp
     system/test_scheduler.cpp
     timers/test_timers.cpp
@@ -106,6 +107,15 @@ add_test(NAME smoke.gpu_frame
         -DWORK_DIR=${RPCS1_SMOKE_DIR}/gpu_frame
         -P "${CMAKE_CURRENT_SOURCE_DIR}/smoke/gpu_frame.cmake")
 set_tests_properties(smoke.gpu_frame PROPERTIES LABELS "smoke")
+
+# GPU (Fase 8): primitivas desenhadas pelo rasterizador, conferidas em BMP.
+add_test(NAME smoke.gpu_draw
+    COMMAND ${CMAKE_COMMAND}
+        -DRPCS1_EXE=$<TARGET_FILE:rpcs1>
+        -DMAKE_BIOS=$<TARGET_FILE:rpcs1_make_test_bios>
+        -DWORK_DIR=${RPCS1_SMOKE_DIR}/gpu_draw
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/smoke/gpu_draw.cmake")
+set_tests_properties(smoke.gpu_draw PROPERTIES LABELS "smoke")
 
 # Abre a janela Win32 de verdade e a fecha após 500 ms (requer área de trabalho interativa).
 if(WIN32)

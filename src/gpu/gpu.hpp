@@ -9,19 +9,19 @@
 // IRQ1 (1Fh), todos os comandos GP1, GPUSTAT, porta do canal 2 de DMA, parâmetros de
 // exibição (que alimentam a temporização de vídeo) e a imagem da área de exibição.
 //
-// NÃO implementado (Fase 8): desenho de polígonos, linhas e retângulos (20h–7Fh). Esses
-// comandos são consumidos e descartados com aviso no log. A execução é instantânea: não há
-// tempo de execução de comandos nem limite real do FIFO (⚠️ D-040).
+// Fase 8: polígonos, linhas, polilinhas e retângulos (20h–7Fh) são desenhados pelo
+// rasterizador por software (gpu/renderer.hpp). A execução é instantânea: não há tempo de
+// execução de comandos nem limite real do FIFO (⚠️ D-040).
 // Versão emulada: GPU v2 (⚠️ adotada para o SCPH-5501, D-041).
 #pragma once
 
 #include <array>
-#include <bitset>
 #include <string_view>
 
 #include "bus/io_device.hpp"
 #include "core/types.hpp"
 #include "dma/dma_port.hpp"
+#include "gpu/renderer.hpp"
 #include "gpu/video_timing.hpp"
 #include "gpu/vram.hpp"
 #include "interrupts/interrupt_controller.hpp"
@@ -78,7 +78,8 @@ public:
 
     [[nodiscard]] Vram& vram() noexcept { return vram_; }
     [[nodiscard]] const Vram& vram() const noexcept { return vram_; }
-    [[nodiscard]] u64 discarded_draw_commands() const noexcept { return discarded_draws_; }
+    [[nodiscard]] u64 primitives_drawn() const noexcept { return primitives_; }
+    [[nodiscard]] u64 pixels_drawn() const noexcept { return renderer_.pixels_drawn(); }
 
     // Número de palavras (comando + parâmetros) de um comando GP0; 0 = polilinha (variável).
     [[nodiscard]] static u32 command_words(u32 command) noexcept;
@@ -97,7 +98,10 @@ private:
     void start_download();
     void upload_halfword(u16 value);
     void set_attribute(u32 word);
-    void discard_draw(u32 opcode);
+    void draw_polygon();
+    void draw_line();
+    void draw_rectangle();
+    [[nodiscard]] DrawEnv draw_env() const noexcept;
     void write_masked(u32 x, u32 y, u16 value);
     void feed_polyline(u32 word);
     void update_video_timing();
@@ -115,7 +119,10 @@ private:
     u32 expected_ = 0;
     bool polyline_ = false;
     bool polyline_gouraud_ = false;
+    bool polyline_semi_ = false;
     u32 polyline_words_ = 0;
+    Vertex polyline_prev_;     // último vértice recebido
+    u32 polyline_color_ = 0;   // cor do próximo vértice (gouraud)
 
     bool upload_active_ = false;
     bool download_active_ = false;
@@ -145,8 +152,8 @@ private:
     bool vram_2mb_ = false; // GP1(09h) bit 0 (v2): endereços Y 512–1023; sem efeito com 1 MiB
     bool irq_flag_ = false;               // GPUSTAT bit 24 (GP0(1Fh) liga, GP1(02h) limpa)
 
-    u64 discarded_draws_ = 0;
-    std::bitset<256> reported_opcodes_;
+    Renderer renderer_{vram_};
+    u64 primitives_ = 0;
 };
 
 } // namespace rpcs1::gpu

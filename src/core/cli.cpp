@@ -128,11 +128,10 @@ std::string usage_text() {
            "      --dump-frame <arq> Após a execução, grava em <arq> (BMP 24 bits) a\n"
            "                         imagem da área de exibição da VRAM.\n"
            "\n"
-           "Estado atual: Fase 7 (CPU, COP0, timers, DMA e GPU: registradores e\n"
-           "VRAM). A BIOS configurada é executada até a primeira instrução que dependa\n"
-           "de um componente inexistente (GTE) ou até o limite de passos. A janela mostra\n"
-           "a área de exibição da VRAM; polígonos, linhas e retângulos ainda não são\n"
-           "desenhados (Fase 8). Não há áudio.\n";
+           "Estado atual: Fase 8 (CPU, COP0, timers, DMA e GPU com renderização por\n"
+           "software). A BIOS configurada é executada até a primeira instrução que\n"
+           "dependa de um componente inexistente (GTE) ou até o limite de passos. A\n"
+           "janela mostra a área de exibição da VRAM ao fim da execução. Não há áudio.\n";
 }
 
 } // namespace rpcs1

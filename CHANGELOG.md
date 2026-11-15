@@ -2,6 +2,24 @@
 
 Formato baseado em "Keep a Changelog". Versões seguem SemVer; antes da 0.1.0 todas são pré-lançamentos.
 
+## [0.0.8] — 15/11/2026 — pré-alfa (Fase 8)
+
+### Adicionado
+- Rasterizador por software da GPU: triângulos, quadriláteros, linhas, polilinhas e retângulos;
+  gouraud; texturas de 4/8/15 bits com CLUT e janela de textura; modulação; semitransparência;
+  dithering; bit de máscara; área e deslocamento de desenho.
+- Regras conferidas contra medições de um SCPH-5501 (psx.wiki): preenchimento de bordas, limites
+  de 1023 × 511, dithering, interpolação de UV, semitransparência, janela de textura.
+- Programa de teste `rpcs1_make_test_bios --gpu-draw` e teste `smoke.gpu_draw`; 21 testes novos.
+
+### Alterado
+- Os comandos de desenho deixaram de ser descartados; o log mostra primitivas e pixels desenhados.
+- O programa de teste da Fase 7 define a área de desenho e desenha um triângulo amarelo.
+
+### Limitações
+- Cache de textura, desenho na área exibida em modo entrelaçado e tempo de desenho não emulados
+  (D-046, D-047).
+
 ## [0.0.7] — 15/11/2026 — pré-alfa (Fase 7)
 
 ### Adicionado

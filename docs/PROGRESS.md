@@ -15,8 +15,8 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
 | 5 | Scheduler e timers | **concluída** | Scheduler, temporização de vídeo (IRQ0) e timers validados contra medições do SCPH-5501; 31 testes novos; 2 divergências de 1 linha registradas (D-033); tempos de memória movidos para a Fase 20 |
 | 6 | DMA | **concluída** | 7 canais, burst/slice/lista/OTC, DPCR/DICR/IRQ3 validados contra medições do SCPH-5501; 19 testes novos; CPU não paralisada durante o DMA (D-036) |
 | 7 | GPU: registradores e VRAM | **concluída** | GP0/GP1, GPUSTAT, VRAM, preenchimento, cópias e transferências (CPU e DMA), exibição 15/24 bits; programa de teste gera imagem conferida pixel a pixel; 26 testes novos; desenho de primitivas descartado com aviso (Fase 8) |
-| 8 | GPU: renderização | não iniciada | Próxima fase |
-| 9 | GTE | não iniciada | |
+| 8 | GPU: renderização | **concluída** | Rasterizador por software com regras medidas no SCPH-5501 (preenchimento, limites, dithering, UV, semitransparência); 21 testes novos; imagem de teste conferida pixel a pixel e por SHA-256 |
+| 9 | GTE | não iniciada | Próxima fase |
 | 10 | MDEC | não iniciada | |
 | 11 | SPU | não iniciada | |
 | 12 | CD-ROM | não iniciada | |
@@ -166,11 +166,31 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
   preenche retângulos, envia um preenchimento por DMA, um triângulo (descartado), transfere e copia
   pixels; o teste `smoke.gpu_frame` confere 31 pixels do BMP gerado.
 
+## Fase 8 — o que foi realmente implementado
+
+- **Rasterizador por software** (`src/gpu/renderer.hpp`), alimentado pelos comandos GP0 20h–7Fh:
+  - Triângulos e quadriláteros (1-2-3 e 2-3-4), planos ou gouraud, com amostragem nos pixels
+    inteiros e regra esquerda/superior (medido: 0,0/10,0/0,10 → x + y ≤ 9; diagonais e leques
+    cobrem cada pixel uma vez; triângulos finos de 200/199/100 pixels).
+  - Vértices de 11 bits com sinal, deslocamento E5h com volta, limite de 1023 × 511 por triângulo
+    e por linha (medido), área de desenho E3h/E4h inclusiva.
+  - Linhas e polilinhas com os extremos incluídos, simétricas, gouraud; polilinhas desenham os
+    cantos duas vezes (medido).
+  - Retângulos 1×1, 8×8, 16×16 e variáveis (largura módulo 1024, altura módulo 512), com
+    textura da página de E1h e espelhamento (E1h bits 12/13).
+  - Texturas de 4, 8 e 15 bits, CLUT, janela de textura E2h, texel 0000h transparente, modulação
+    (texel × cor)/128 saturada, texturas cruas; página de textura dos polígonos atualiza E1h bits
+    0–8 e 11.
+  - Semitransparência nos 4 modos (B/2 + F/2 medido), só em texels com bit 15 nas primitivas
+    texturizadas; dithering 4×4 (medido) em polígonos gouraud/modulados e em linhas; bit de máscara.
+- **Programa de teste** `rpcs1_make_test_bios --gpu-draw` e teste `smoke.gpu_draw` (17 pixels
+  calculados à mão e SHA-256); o programa da Fase 7 agora desenha um triângulo amarelo.
+
 ## Recursos ausentes (conscientemente)
 
-- Desenho de polígonos, linhas e retângulos, texturas, CLUT, semitransparência, dithering, área e
-  deslocamento de desenho (Fase 8); tempo de execução dos comandos, limite de 16 palavras do FIFO e
-  cópia em blocos com sobreposição (D-040, D-042).
+- Cache de textura (e os artefatos medidos de U ímpar em retângulos), desenho na área exibida em
+  modo entrelaçado (E1h bit 10), tempo de execução dos comandos, limite de 16 palavras do FIFO e
+  cópia em blocos com sobreposição (D-040, D-042, D-046, D-047).
 - Laço de emulação em tempo real com a janela aberta (Fase 20): a janela mostra o estado final.
 - GTE (COP2); SPU, CD-ROM, MDEC, SIO, controles, Memory Cards — seus canais de DMA já existem, mas
   os dispositivos ainda são marcadores.
@@ -181,7 +201,7 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
 
 ## Próxima dependência técnica
 
-**Fase 8 — GPU: renderização:** rasterização de triângulos e quadriláteros (planos, gouraud e
-texturizados com CLUT de 4/8 bits e 15 bits diretos), linhas e polilinhas, retângulos, área e
-deslocamento de desenho, semitransparência, dithering, janela de textura e bit de máscara. Os comandos
-já chegam inteiros e alinhados ao ponto em que hoje são descartados (`Gpu::discard_draw`).
+**Fase 9 — GTE (COP2):** registradores de dados e de controle, MFC2/MTC2/CFC2/CTC2/LWC2/SWC2 e os
+comandos (RTPS/RTPT, NCLIP, MVMVA, NCDS/NCCS, AVSZ3/4, OP, DPCS, INTPL, SQR, GPF/GPL...) com FLAG,
+saturações e a divisão de perspectiva por tabela. É a instrução da GTE que hoje para a execução da
+BIOS e é ela que alimenta a GPU com vértices nos jogos.

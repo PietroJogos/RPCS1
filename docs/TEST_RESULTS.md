@@ -3,6 +3,48 @@
 Registro dos testes **realmente executados**. Cada entrada indica ambiente, comando e resultado.
 A entrada mais recente fica no topo.
 
+## 15/11/2026 — Fase 8 (versão 0.0.8)
+
+**Ambiente:** o mesmo da Fase 7. Build limpo a partir de pasta vazia (`build/msvc` apagada),
+`RPCS1_MSVC_MP_JOBS=1` e `/m:1`.
+
+### Compilação: Debug e Release sem avisos (`/W4 /WX`). CTest: 10/10 em Debug e 10/10 em Release.
+
+### Testes unitários: 288/288 (267 anteriores + 21 novos), em Debug e Release
+| Grupo | Casos | O que verifica |
+|---|---|---|
+| `render/` | 21 | Regra de preenchimento (triângulo retângulo nos dois sentidos, diagonais e leque sem sobreposição, triângulos finos de 200/199/100 pixels); limites 1023/1024 e 511/512 em triângulos, quadriláteros e linhas; 11 bits e deslocamento E5h com volta; área E3h/E4h inclusiva; linha gouraud com e sem dithering (ida e volta); linhas (extremos, simetria em 7 inclinações, 1 pixel); polilinha fechada e gouraud; UV arredondado; página de textura do polígono em E1h; semitransparência medida (62h e 67h) e modos 1–3; CLUT de 4 e 8 bits e texel 0000h; texel 8000h opaco; janela E2h; modulação; escopo do dithering; máscara; retângulos (tamanhos, módulo 1024, deslocamento, espelho); quadrilátero gouraud texturizado com recorte |
+
+Os casos marcados "medido" reproduzem números publicados no psx.wiki para um SCPH-5501 (tabela em
+`HARDWARE_ARCHITECTURE.md`, seção 10.8); todos passaram sem ajuste no rasterizador.
+
+### Testes de fumaça
+- `smoke.gpu_draw` (novo): BIOS sintética `--gpu-draw` com 9 primitivas; 17 pixels calculados à mão
+  (fundo, gouraud, plano, texel modulado com dithering = F7F7F7h, sprite cru, semitransparência
+  sobre amarelo e sobre o fundo, polilinha, aditivo, deslocamento E5h) e SHA-256
+  `B05BC41D…FA227AD` (igual em Debug e Release).
+- `smoke.gpu_frame`: o triângulo da Fase 7 agora é desenhado; 8 pixels das bordas conferidos; novo
+  SHA-256 `7826EF8E…10DF964F`.
+- Imagens conferidas visualmente no BMP e na janela Win32 real (captura de tela).
+
+### Teste de mutação
+- 6 defeitos introduzidos de uma vez em `renderer.cpp` (regra esquerda/superior invertida, linha da
+  matriz de dithering trocada, arredondamento da semitransparência, UV truncado em vez de
+  arredondado, texel 8000h tratado como transparente, limite de largura ≥ 1023). Build mutante
+  compilou (exit 0): **9 testes unitários e os 2 testes de imagem falharam**.
+- O defeito "8000h transparente" não foi detectado na primeira rodada: foi criado o teste
+  "texel 8000h é preto opaco", e a mutação isolada passou a falhar em 2 testes. Código restaurado.
+
+### Problemas encontrados e corrigidos
+- Um teste de limite usava um quadrilátero cujos dois triângulos passavam de 1023 (erro do teste,
+  não do rasterizador); corrigido e mantido como caso negativo.
+- Dois valores esperados de dithering estavam errados no teste (cor 43h não distingue as posições);
+  trocada a cor para 42h antes da primeira execução.
+
+### Não testado
+- Tabela de octantes das linhas, artefatos da cache de textura, espelho começando em U + 1 e
+  ponto fixo da cor gouraud (D-044 a D-047). Nenhuma BIOS real nem jogo foi executado.
+
 ## 15/11/2026 — Fase 7 (versão 0.0.7)
 
 **Ambiente:** o mesmo das fases anteriores (Windows 11 x64, MSVC 19.44, CMake 4.x), com pouca memória

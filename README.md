@@ -2,13 +2,13 @@
 
 **Emulador original de PlayStation 1 para Windows 10 e 11 — desenvolvido pelo PiStudio BR.**
 
-> ⚠️ **Estado atual: pré-alfa (Fase 7 — GPU: registradores e VRAM).** Memória, barramento, CPU,
-> COP0, interrupções, I-cache, timers, temporização de vídeo, DMA e a parte de registradores e VRAM
-> da GPU estão emulados e testados. Programas podem preencher, copiar e transferir pixels na VRAM e
-> a área de exibição aparece na janela — mas **polígonos, linhas e retângulos ainda não são
-> desenhados** (Fase 8). A BIOS configurada é executada até a primeira instrução da GTE ou até o
-> limite de passos; sem GTE, CD-ROM, SPU e demais periféricos ela não chega ao fim da
-> inicialização. Não há som. **Nenhum jogo, BIOS ou programa de PS1 roda por completo.**
+> ⚠️ **Estado atual: pré-alfa (Fase 8 — GPU: renderização por software).** Memória, barramento,
+> CPU, COP0, interrupções, I-cache, timers, temporização de vídeo, DMA e a GPU (VRAM, transferências
+> e desenho de polígonos, linhas e retângulos com texturas, semitransparência e dithering) estão
+> emulados e testados, com regras conferidas contra medições de um SCPH-5501. A BIOS configurada
+> é executada até a primeira instrução da GTE ou até o limite de passos; sem GTE, CD-ROM, SPU e
+> demais periféricos ela não chega ao fim da inicialização. Não há som. **Nenhum jogo, BIOS ou
+> programa de PS1 roda por completo.**
 
 ## Objetivo
 
@@ -19,6 +19,8 @@ emuladores. Veja o [roadmap das 26 fases](docs/ROADMAP.md) e o [progresso](docs/
 
 ## O que existe hoje
 
+- **Fase 8:** rasterizador por software — triângulos, quadriláteros, linhas, retângulos,
+  gouraud, texturas 4/8/15 bits com CLUT, semitransparência, dithering, máscara e área de desenho.
 - **Fase 7:** GPU — GP0/GP1, GPUSTAT, VRAM de 1 MiB, preenchimento, cópias e transferências
   (CPU e DMA), modos de exibição de 15/24 bits e imagem na janela ou em BMP (`--dump-frame`).
 - **Fase 6:** DMA com os 7 canais (burst, slice, lista encadeada, OTC), DPCR, DICR e IRQ3.
@@ -35,7 +37,7 @@ emuladores. Veja o [roadmap das 26 fases](docs/ROADMAP.md) e o [progresso](docs/
 - Tratamento de erros por valor, asserções e registro de falhas fatais.
 - Configuração `rpcs1.ini` validada e comentada, criada na primeira execução.
 - Janela Win32 DPI-aware que apresenta a área de exibição da VRAM em proporção 4:3.
-- 267 testes unitários e 8 testes de fumaça do executável.
+- 288 testes unitários e 9 testes de fumaça do executável.
 - Documentação técnica do hardware: [docs/HARDWARE_ARCHITECTURE.md](docs/HARDWARE_ARCHITECTURE.md).
 
 ## Compilar

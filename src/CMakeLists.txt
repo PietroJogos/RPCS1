@@ -42,6 +42,7 @@ add_library(rpcs1_hw STATIC
     cpu/icache.cpp
     dma/dma_controller.cpp
     gpu/gpu.cpp
+    gpu/renderer.cpp
     gpu/video_timing.cpp
     interrupts/interrupt_controller.cpp
     memory/bios_rom.cpp

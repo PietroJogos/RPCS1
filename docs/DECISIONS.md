@@ -269,6 +269,46 @@ acrescentadas no fim; decisões revistas são marcadas como substituídas, não 
 - Comandos de desenho (20h–7Fh) são consumidos com o número exato de palavras e descartados com um
   aviso por opcode, para que nada pareça desenhado sem ter sido.
 
+## D-044 — Rasterização de triângulos (Fase 8)
+- Amostragem nas coordenadas inteiras dos pixels, com arestas esquerdas e superiores incluídas e
+  direitas e inferiores excluídas (equivale a desenhar `[x_esq, x_dir)` em cada linha `[y_topo,
+  y_base)`). Confere com todas as contagens medidas no psx.wiki (triângulo retângulo, diagonais,
+  leque, triângulos finos de 200/199/100 pixels).
+- Interpolação afim exata (inteiros de 64 bits) da cor gouraud e de U/V, arredondada para o mais
+  próximo (medido para U: "00 10 … 80 8F …"). ⚠️ Para a cor o arredondamento foi adotado igual ao de
+  U/V; o formato de ponto fixo do hardware não é documentado e pode divergir em casos raros.
+- Triângulo de área zero não desenha nada (⚠️). Limite de 1023 × 511 avaliado por triângulo
+  (medido: quadrilátero de 1060 com triângulos menores que 1024 é desenhado).
+
+## D-045 — Linhas (Fase 8) ⚠️
+- O algoritmo do hardware não é documentado. Adotado: DDA com `max(|dx|, |dy|)` passos, posição
+  menor arredondada para o mais próximo, sempre a partir do extremo de cima (e da esquerda), o que
+  garante o resultado igual nos dois sentidos (medido: simétrico). Extremos incluídos, extremos
+  iguais = 1 pixel e cor gouraud conferem com as medições; a escolha de pixel nos casos de meio
+  passo não foi comparada com a tabela de octantes publicada.
+
+## D-046 — Texturas e retângulos (Fase 8) ⚠️
+- A cache de textura não é emulada: o artefato medido em retângulos com U ímpar (um texel repetido
+  a cada 4 pixels) não é reproduzido; a imagem usa sempre o texel exato.
+- Espelhamento de retângulos (E1h bits 12/13): U/V decrescem a partir do valor do comando. A
+  medição publicada (8×8, U 0, espelho em X) começa em 01h ("01 00 FF …"), um a mais: diferença
+  registrada, ligada à cache, não emulada.
+- Tamanho variável: largura AND 3FFh e altura AND 1FFh (medido: 1025 → 1, 1024 → 0, 513 → 1).
+
+## D-047 — Cor, semitransparência e pontos não emulados (Fase 8) ⚠️
+- Modulação: `((texel5 << 3) × cor8) >> 7` em 8 bits, depois dithering (se ligado), saturação em
+  0..255 e `>> 3`. A página "rendering" do psx.wiki cita fórmulas da v0/v2 em escalas diferentes;
+  adotada a forma "/128" (80h = neutro), que confere com o psx-spx.
+- Semitransparência calculada em 5 bits sobre a cor já quantizada (medido no modo 0: (B + F)/2 com
+  arredondamento para baixo); modos 1–3 com saturação em 0..31. A ordem dithering → mistura não foi
+  medida.
+- Dithering: polígonos gouraud ou modulados e todas as linhas; polígonos planos sem textura e
+  retângulos nunca (psx-spx e psx.wiki "rendering"; um resumo de teste diz o contrário para
+  retângulos, sem dados verbatim).
+- Não emulados: E1h bit 10 (desenho na área exibida em modo entrelaçado), tempo de desenho (os
+  comandos continuam instantâneos, D-040) e o terminador de polilinha 5555000Ch citado num teste
+  (não explicado pela regra F000F000h).
+
 ## D-010 — MSVC como compilador de referência
 - **Decisão:** Visual Studio 2022 (MSVC 19.44) é o compilador verificado. O código evita
   extensões específicas, mas nenhum outro compilador foi testado ainda (o MinGW disponível na

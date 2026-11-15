@@ -165,10 +165,9 @@ void Application::initialize_hardware(const CommandLine& cl) {
 
     // Honestidade sobre o estado: o que existe e o que ainda falta.
     log::warn(Category::Core,
-              "Fase 7: CPU, COP0, interrupções, timers, vídeo, DMA e GPU (registradores, VRAM, "
-              "preenchimento e transferências) emulados. A GPU ainda não desenha polígonos, linhas "
-              "nem retângulos (Fase 8); sem GTE (Fase 9). SPU, CD-ROM, MDEC e demais periféricos "
-              "ainda não existem.");
+              "Fase 8: CPU, COP0, interrupções, timers, vídeo, DMA e GPU (VRAM, transferências e "
+              "renderização por software de polígonos, linhas e retângulos) emulados; sem GTE "
+              "(Fase 9). SPU, CD-ROM, MDEC e demais periféricos ainda não existem.");
 
     if (settings_.bios_path.empty()) {
         log::info(Category::Bios, "Nenhuma BIOS configurada ([BIOS] path); a CPU não será executada.");
@@ -223,9 +222,9 @@ void Application::log_gpu_state() {
     const gpu::DisplayInfo d = gpu.display_info();
     log::info(Category::Gpu,
               "GPU: exibição {} | {}×{} ({} bits) a partir de VRAM ({}, {}) | GPUSTAT {:08X}h | "
-              "{} comandos de desenho descartados (Fase 8).",
+              "{} primitivas desenhadas ({} pixels).",
               d.enabled ? "ligada" : "desligada", d.width, d.height, d.depth24 ? 24 : 15,
-              d.start_x, d.start_y, gpu.gpustat(), gpu.discarded_draw_commands());
+              d.start_x, d.start_y, gpu.gpustat(), gpu.primitives_drawn(), gpu.pixels_drawn());
 }
 
 Status Application::dump_frame(const std::filesystem::path& path) {
