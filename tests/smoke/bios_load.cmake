@@ -1,8 +1,9 @@
 # Carregamento e execução de BIOS pela configuração, usando arquivos SINTÉTICOS
 # (nenhuma BIOS real). Verifica que:
-#  1. uma BIOS sintética com programa MIPS é executada pela CPU emulada até o primeiro
-#     MFC0 (limite da Fase 3), escrevendo o código POST 7;
-#  2. 512 KiB de bytes 41h param na primeira instrução (41414141h é um opcode COP0);
+#  1. uma BIOS sintética com programa MIPS é executada: POST 7, SYSCALL atendido por um
+#     tratador próprio (POST 8, retorno com RFE), POST 9 e parada no comando da GTE (Fase 9);
+#  2. 512 KiB de bytes 41h (opcode COP0 inválido) geram exceções RI repetidas até o limite
+#     de passos informado em --cpu-steps;
 #  3. arquivos de tamanho errado ou ausentes são rejeitados com mensagem clara;
 #  4. em todos os casos o programa encerra normalmente.
 if(NOT DEFINED RPCS1_EXE OR NOT DEFINED MAKE_BIOS OR NOT DEFINED WORK_DIR)
@@ -23,7 +24,7 @@ file(WRITE "${WORK_DIR}/pequena.bin" "ABC")
 function(run_with_bios bios_file out_var code_var)
     file(WRITE "${WORK_DIR}/rpcs1.ini" "[BIOS]\npath = ${bios_file}\n[Log]\nfile =\n")
     execute_process(
-        COMMAND "${RPCS1_EXE}" --headless --config "${WORK_DIR}/rpcs1.ini"
+        COMMAND "${RPCS1_EXE}" --headless --config "${WORK_DIR}/rpcs1.ini" ${ARGN}
         RESULT_VARIABLE code
         OUTPUT_VARIABLE out
         ERROR_VARIABLE err)
@@ -47,16 +48,20 @@ endfunction()
 run_with_bios("programa.bin" out code)
 expect_exit_zero("${code}" "${out}")
 expect_contains("${out}" "BIOS carregada")
-expect_contains("${out}" "CPU executou 305 instruções da BIOS (305 ciclos")
 expect_contains("${out}" "POST (1F802041h) = 7h")
-expect_contains("${out}" "mfc0")
-expect_contains("${out}" "requer a Fase 4")
+expect_contains("${out}" "POST (1F802041h) = 8h")
+expect_contains("${out}" "POST (1F802041h) = 9h")
+expect_contains("${out}" "CPU executou 16 instruções da BIOS (17 ciclos, 1 exceções/interrupções")
+expect_contains("${out}" "cop2 0x0180001")
+expect_contains("${out}" "requer a Fase 9")
+expect_contains("${out}" "Última exceção: Sys em BFC00010h")
 
-run_with_bios("letras.bin" out code)
+run_with_bios("letras.bin" out code --cpu-steps 1000)
 expect_exit_zero("${code}" "${out}")
 expect_contains("${out}" "primeira instrução: 41414141h")
-expect_contains("${out}" "CPU executou 0 instruções")
-expect_contains("${out}" "requer a Fase 4")
+expect_contains("${out}" "CPU executou 0 instruções da BIOS (1000 ciclos, 1000 exceções/interrupções")
+expect_contains("${out}" "Limite de 1000 passos atingido")
+expect_contains("${out}" "Última exceção: RI em BFC00180h")
 
 run_with_bios("pequena.bin" out code)
 expect_exit_zero("${code}" "${out}")

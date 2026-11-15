@@ -81,10 +81,23 @@ TEST_CASE("cli/erros") {
     CHECK(positional.error().code == ErrorCode::Unsupported);
 }
 
+TEST_CASE("cli/--cpu-steps") {
+    auto a = parse({"--cpu-steps", "1000"});
+    REQUIRE(a.ok());
+    CHECK_EQ(*a.value().cpu_steps, u64{1000});
+    auto b = parse({"--cpu-steps=10000000000"});
+    REQUIRE(b.ok());
+    CHECK_EQ(*b.value().cpu_steps, u64{10000000000ull});
+    CHECK(!parse({"--cpu-steps", "0"}).ok());
+    CHECK(!parse({"--cpu-steps", "10000000001"}).ok());
+    CHECK(!parse({"--cpu-steps", "muito"}).ok());
+    CHECK(!parse({}).value().cpu_steps.has_value());
+}
+
 TEST_CASE("cli/texto de uso menciona as opções") {
     const std::string usage = usage_text();
     for (const char* option : {"--help", "--version", "--config", "--log-level", "--headless",
-                               "--exit-after"}) {
+                               "--exit-after", "--cpu-steps"}) {
         CHECK(usage.find(option) != std::string::npos);
     }
 }

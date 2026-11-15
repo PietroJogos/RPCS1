@@ -15,9 +15,12 @@ class Machine {
 public:
     static constexpr u32 code_base = 0x80010000; // KSEG0, como os PS-EXE
     static constexpr u32 data_base = 0x80002000;
+    static constexpr u32 exception_vector = 0x80000080; // BEV = 0
 
+    // SR = 0 (BEV = 0, kernel, interrupções desligadas), como depois da inicialização da BIOS.
     explicit Machine(const std::vector<u32>& program, u32 at = code_base) {
         load(program, at);
+        cpu.cop0().write(cpu::cop0reg::sr, 0);
         cpu.set_pc(at);
     }
 

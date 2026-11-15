@@ -2,10 +2,11 @@
 
 **Emulador original de PlayStation 1 para Windows 10 e 11 — desenvolvido pelo PiStudio BR.**
 
-> ⚠️ **Estado atual: pré-alfa (Fase 3 — CPU).** Memória, barramento e o interpretador da CPU
-> estão emulados e testados. A BIOS configurada é executada **apenas até a primeira instrução de
-> coprocessador (COP0)**, que ainda não existe — o log mostra até onde chegou. Não há vídeo nem
-> áudio: a janela exibe tela preta. **Nenhum jogo, BIOS ou programa de PS1 roda por completo.**
+> ⚠️ **Estado atual: pré-alfa (Fase 4 — CPU com COP0).** Memória, barramento, CPU, COP0,
+> exceções, interrupções e I-cache estão emulados e testados. A BIOS configurada é executada até a
+> primeira instrução da GTE (Fase 9) ou até o limite de passos — sem timers, GPU e demais
+> periféricos ela não chega ao fim da inicialização. Não há vídeo nem áudio: a janela exibe tela
+> preta. **Nenhum jogo, BIOS ou programa de PS1 roda por completo.**
 
 ## Objetivo
 
@@ -16,8 +17,10 @@ emuladores. Veja o [roadmap das 26 fases](docs/ROADMAP.md) e o [progresso](docs/
 
 ## O que existe hoje
 
-- **Fase 3:** interpretador da CPU R3000A com delay slots, load delay, MULT/DIV com latência
-  documentada e detecção de exceções (o despacho ao vetor vem na Fase 4).
+- **Fase 4:** COP0 (SR, CAUSE, EPC...), despacho de exceções, interrupções de hardware e
+  software, modo usuário, I-cache, isolamento de cache e controlador de interrupções.
+- **Fase 3:** interpretador da CPU R3000A com delay slots, load delay e MULT/DIV com latência
+  documentada.
 - **Fase 2:** barramento com segmentos KUSEG/KSEG0/KSEG1/KSEG2, RAM de 2 MiB (espelhos pelo
   DRAM_CTRL), scratchpad, BIOS ROM de 512 KiB, Memory Control, regiões de expansão, display
   POST, erros de alinhamento e de barramento. Periféricos aparecem como "não implementados" no log.
@@ -26,7 +29,7 @@ emuladores. Veja o [roadmap das 26 fases](docs/ROADMAP.md) e o [progresso](docs/
 - Tratamento de erros por valor, asserções e registro de falhas fatais.
 - Configuração `rpcs1.ini` validada e comentada, criada na primeira execução.
 - Janela Win32 DPI-aware com apresentação de framebuffer em proporção 4:3.
-- 155 testes unitários e 7 testes de fumaça do executável.
+- 191 testes unitários e 7 testes de fumaça do executável.
 - Documentação técnica do hardware: [docs/HARDWARE_ARCHITECTURE.md](docs/HARDWARE_ARCHITECTURE.md).
 
 ## Compilar

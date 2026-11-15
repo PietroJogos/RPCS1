@@ -3,6 +3,40 @@
 Registro dos testes **realmente executados**. Cada entrada indica ambiente, comando e resultado.
 A entrada mais recente fica no topo.
 
+## 15/11/2026 — Fase 4 (versão 0.0.4)
+
+**Ambiente:** o mesmo das fases anteriores; build limpo a partir de pasta vazia, Debug e Release.
+
+### Compilação
+| Configuração | Resultado | Avisos (`/W4 /permissive- /WX`) |
+|---|---|---|
+| Debug | ✅ sucesso | 0 |
+| Release | ✅ sucesso | 0 |
+
+### CTest: 8/8 em Debug e 8/8 em Release
+`smoke.bios_load` usa uma nova BIOS **sintética** (programa próprio): POST 7 → `SYSCALL` atendido
+pelo tratador em BFC00180h (POST 8, retorno com `RFE`) → POST 9 → liga CU2 e para no comando da
+GTE indicando a Fase 9. O log confere **16 instruções, 17 ciclos, 1 exceção**. Com 512 KiB de
+bytes `41h` e `--cpu-steps 1000`, o log confere 1000 exceções RI em BFC00180h e o limite atingido.
+
+### Testes unitários: 191/191 (155 anteriores + 36 novos)
+| Grupo | Casos | Cobertura |
+|---|---|---|
+| `cop0/` | 17 | Reset, MTC0/MFC0 com atraso, DCIC, bits fixos do SR, somente leitura, RI (5 regs), r16–r31, TLB/CFC0, RFE (4), empilhamento (3), BEV, BD/BT/TAR, BadVaddr, CE (8), COP1/COP3, CU0 em modo usuário, acessos fora do KUSEG (5 + busca), tratador completo com retorno |
+| `irq/`, `irq_controller/`, `console/` | 10 | IRQ de hardware antes da instrução, máscaras (3), software, delay slot, carga concluída, bit 10 ao vivo, I_STAT/I_MASK, ligação ao barramento, IRQ ponta a ponta com reconhecimento, power_on/reset |
+| `icache/` | 7 | Desligada, código obsoleto e KSEG1, preenchimento (4 + IBLKSZ 0), aliases KUSEG/KSEG0, isolamento IS1 e TAG, rotina de limpeza estilo BIOS sem apagar a RAM |
+| Ajustados da Fase 3 | 3 | Overflow agora desvia ao vetor; GTE com CU2 para (Fase 9); exceções não param a execução |
+| `cli/` | 1 | `--cpu-steps` |
+
+### Teste de mutação
+Isolamento de cache desligado + empilhamento de SR removido: **8 testes falharam** como esperado;
+código restaurado e conferido.
+
+### Não testado
+- Nenhuma BIOS real (nenhuma fornecida).
+- Disparo de breakpoints de hardware (não implementado, D-030).
+- Os casos ⚠️ D-025 a D-030 seguem a arquitetura R3000 ou escolhas documentadas.
+
 ## 15/11/2026 — Fase 3 (versão 0.0.3)
 
 **Ambiente:** o mesmo das fases anteriores; build limpo a partir de pasta vazia, Debug e Release.

@@ -133,6 +133,39 @@ acrescentadas no fim; decisões revistas são marcadas como substituídas, não 
 - SWL/SWR parciais viram escritas de byte (correto para RAM; ⚠️ em E/S o resultado é
   desconhecido segundo o psx-spx).
 
+## D-025 — SR no reset e na entrada de exceção (Fase 4) ⚠️
+- **Reset:** SR = BEV (400000h): kernel, interrupções desligadas, vetores em ROM — convenção da
+  arquitetura R3000; o psx-spx não informa o valor. A BIOS grava SR logo no início.
+- **Entrada em exceção:** (KUc, IEc) → (KUp, IEp) → (KUo, IEo), entrando em modo kernel sem
+  interrupções — o inverso do RFE documentado. CE fica zero fora de CpU.
+
+## D-026 — Regras de acesso ao COP0 não documentadas ⚠️
+- MTC0 em TAR, BadVaddr, EPC, PRID e registradores inexistentes é ignorado; leitura de r16–r31
+  devolve zero (no hardware é imprevisível). Comandos COP0 além de RFE e CFC0/CTC0/BC0x geram RI.
+
+## D-027 — COP1/COP3 inexistentes ⚠️
+- Com CU1/CU3 desligados geram CpU (CE = 1/3). Com eles ligados, o comportamento não é
+  documentado: as instruções não têm efeito.
+
+## D-028 — Modelo da I-cache e do isolamento ⚠️ em parte
+- **Documentado e implementado:** geometria, tag física, preenchimento até o fim da linha,
+  IBLKSZ, KSEG1 sem cache, código obsoleto após escrita na RAM, isolamento com TAG/IS1.
+- **Escolhas:** tag coincidente com palavra inválida soma a nova validade à existente (o psx-spx
+  se contradiz); IBLKSZ = 2–3 tratado como 4; com IS1 = 0 a cache não é usada e stores isolados são
+  descartados; SB/SH isolados gravam o registrador inteiro; bits 31–5 do load de tag leem zero;
+  LOCK/INV e os bits RAM/DS do scratchpad não têm efeito; o KSEG2 não é afetado pelo isolamento.
+- **Ausente:** custos de acerto e falha (Fase 5).
+
+## D-029 — Controlador de interrupções antecipado para a Fase 4
+- A especificação da Fase 4 inclui "interrupções da CPU" e "máscaras de interrupção"; para testar
+  o caminho completo, I_STAT/I_MASK foram implementados agora (antes previstos na Fase 5).
+- ⚠️ Bits 16–31 ("lixo" no hardware) leem zero; escritas estreitas usam o registrador inteiro (D-014).
+- A classe `system::Console` passa a possuir e interligar barramento, controlador e CPU.
+
+## D-030 — Breakpoints de hardware adiados
+- BPC/BDA/BDAM/BPCM/DCIC são armazenados com as máscaras documentadas, mas não disparam: o
+  psx-spx é contraditório sobre o bit TR, e o uso principal é depuração (Fase 23).
+
 ## D-010 — MSVC como compilador de referência
 - **Decisão:** Visual Studio 2022 (MSVC 19.44) é o compilador verificado. O código evita
   extensões específicas, mas nenhum outro compilador foi testado ainda (o MinGW disponível na

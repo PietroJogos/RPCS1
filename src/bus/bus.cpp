@@ -18,7 +18,7 @@ using memory::DelayDevice;
 constexpr std::array<IoSlotInfo, static_cast<usize>(IoSlot::Count)> io_slots = {{
     {IoSlot::Sio0, 0x1F801040, 0x1F801050, "SIO0 (controles/Memory Cards)", 18},
     {IoSlot::Sio1, 0x1F801050, 0x1F801060, "SIO1 (porta serial)", 18},
-    {IoSlot::Interrupts, 0x1F801070, 0x1F801078, "controlador de interrupções", 5},
+    {IoSlot::Interrupts, 0x1F801070, 0x1F801078, "controlador de interrupções", 4},
     {IoSlot::Dma, 0x1F801080, 0x1F801100, "DMA", 6},
     {IoSlot::Timers, 0x1F801100, 0x1F801130, "timers", 5},
     {IoSlot::Cdrom, 0x1F801800, 0x1F801804, "CD-ROM", 12},

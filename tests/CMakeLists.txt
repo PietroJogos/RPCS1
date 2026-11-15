@@ -14,8 +14,11 @@ add_executable(rpcs1_tests
     core/test_unicode.cpp
     bus/test_address.cpp
     bus/test_bus.cpp
+    cpu/test_cop0.cpp
     cpu/test_cpu_alu.cpp
     cpu/test_cpu_branch.cpp
+    cpu/test_icache.cpp
+    cpu/test_interrupts.cpp
     cpu/test_cpu_exceptions.cpp
     cpu/test_cpu_memory.cpp
     cpu/test_cpu_muldiv.cpp

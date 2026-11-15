@@ -211,13 +211,47 @@ Na exceção, os pares IE/KU formam uma pilha de 3 níveis que é empurrada; `RF
 
 Segundo o psx-spx, o PS1 usa na prática apenas os vetores BEV = 0 (além do reset).
 
+### 3.5.1 Regras de acesso e de exceção (verificadas na Fase 4)
+
+- **CAUSE** é somente leitura, exceto os bits 8–9 (interrupções de software). O bit 10 reflete
+  ao vivo `(I_STAT AND I_MASK) != 0` e não é um latch; os bits 11–15 são sempre zero no PS1.
+- **Interrupção** ocorre quando SR.IEc = 1 e algum bit de CAUSE 8–15 está habilitado em SR.Im.
+  Interrupções sempre retornam a EPC + 0 (um desvio em delay slot é reexecutado).
+- **TAR** só é atualizado em exceção dentro de delay slot de desvio tomado (BD = BT = 1);
+  **BadVaddr** só por AdEL/AdES (inclusive acesso fora do KUSEG em modo usuário).
+- **CE** (CAUSE bits 28–29) recebe o número do coprocessador em CpU.
+- **COP0:** ler r0–r2, r4 ou r10 gera RI; r16–r31 leem valores imprevisíveis (podem ser lidos
+  mesmo em modo usuário sem CU0). Só o comando RFE existe; TLBR/TLBWI/TLBWR/TLBP geram RI.
+  LWC0/SWC0 geram CpU. Em modo usuário, o COP0 exige CU0. COP2 com CU2 = 0 gera CpU (CE = 2).
+- **DCIC** (r7): bits 0–5 status, 12–13 redirecionamento, 23–31 habilitações (PC, dados, leitura,
+  escrita, kernel/usuário, salto ao vetor de depuração 80000040h). BPC/BPCM e BDA/BDAM disparam
+  quando `((PC XOR BPC) AND BPCM) = 0` / `((addr XOR BDA) AND BDAM) = 0`.
+- **Peculiaridade da GTE:** se uma interrupção chega sobre um comando COP2, o comando é executado
+  e EPC ainda aponta para ele; BIOS mais novas somam 4 ao EPC nesse caso (relevante na Fase 9).
+
 ### 3.6 Controle de cache (KSEG2)
 
 `FFFE0130h` é o registrador BIU/Cache Control (BCC), com bits LOCK (0), INV (1), TAG (2),
 RAM (3, habilita scratchpad), DBLKSZ (4–5), DS (7), IBLKSZ (8–9), IS1 (11, habilita I-cache),
 INTP (12), RDPRI (13), NOPAD (14), BGNT (15), LDSCH (16), NOSTR (17). A BIOS usa SR.IsC
 junto com esse registrador para invalidar a I-cache — o RPCS1 precisa reproduzir isso para
-que o boot funcione.
+que o boot funcione. A BIOS grava `0001E988h` (RAM, DS, IBLKSZ = 4, IS1, RDPRI, NOPAD, BGNT, LDSCH).
+
+### 3.7 I-cache e isolamento
+
+- 4 KiB, mapeamento direto, 256 linhas de 4 palavras; índice = bits 11–4; tag = endereço
+  **físico** bits 31–12 + 4 bits de validade (um por palavra). Aliases KUSEG/KSEG0 dividem a tag.
+- Falha: preenche da palavra acessada até o fim da linha (palavra 0 → 0Fh, 1 → 0Eh, 2 → 0Ch,
+  3 → 08h). IBLKSZ = 0 limita a falha na palavra 0 a duas palavras.
+- Escritas na RAM não atualizam a cache: código automodificado roda obsoleto até a limpeza.
+- Com SR.IsC = 1, loads/stores vão para a cache. Com BCC.TAG + IS1, um store grava a tag (do
+  endereço) e a validade (bits 3–0 do dado), e um load devolve a validade e, no bit 4, se a tag
+  coincide. Só com IS1, stores gravam palavras de código.
+- Rotina de limpeza da BIOS: com TAG + IS1 e IsC, zera a base de cada linha (0000h–0FF0h); depois,
+  só com IS1, zera cada palavra; por fim restaura BCC e SR.
+
+⚠️ O psx-spx se contradiz sobre o caso "tag coincide mas a palavra é inválida" (refill completo ×
+a partir da palavra acessada) e não descreve LOCK/INV, IS1 = 0 nem custos de acerto/falha.
 
 ---
 
@@ -1045,9 +1079,15 @@ Requisitos para considerar o recurso implementado:
 | 22 | MTHI/MTLO durante MULT/DIV em andamento; "não tocar HI/LO por ~2 ciclos" | 3 ⚠️ |
 | 23 | Valores de GPR, HI e LO após o reset | 3 ⚠️ adotado: zero |
 | 24 | Comportamento de COP1/COP3, LWC0/1/3 e SWC0/1/3 | 4 |
-| 25 | Ciclos por instrução, custo da I-cache e de buscas sem cache | 4, 5 |
+| 25 | Ciclos por instrução, custo da I-cache e de buscas sem cache | 5 |
+| 26 | Valor de SR após o reset; empilhamento de SR na entrada de exceção | 4 ⚠️ adotado: arquitetura R3000 |
+| 27 | MTC0 em registradores somente leitura/inexistentes; CE fora de CpU | 4 ⚠️ adotado: ignorado / zero |
+| 28 | COP1/COP3, LWC1/3, SWC1/3 com CU1/CU3 ligados; CFC0/CTC0/BC0x | 4 ⚠️ adotado: sem efeito / RI |
+| 29 | Modos LOCK/INV do BCC; I-cache com IS1 = 0; stores de 8/16 bits na cache isolada | 4 ⚠️ |
+| 30 | Disparo de breakpoints de hardware (conflito TR × "sempre salta") | 23 |
+| 31 | Bits 16–31 de I_STAT/I_MASK ("lixo") | 4 ⚠️ adotado: zero |
 
-As escolhas marcadas como "adotado" estão justificadas em `docs/DECISIONS.md` (D-012 a D-024)
+As escolhas marcadas como "adotado" estão justificadas em `docs/DECISIONS.md` (D-012 a D-030)
 e cobertas por testes, para que qualquer correção futura fique visível como mudança de teste.
 
 Itens de 1 a 9 serão resolvidos com programas de teste próprios e/ou suítes de teste públicas

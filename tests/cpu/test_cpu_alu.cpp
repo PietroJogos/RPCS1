@@ -92,8 +92,9 @@ TEST_CASE("cpu/ADD, ADDI e SUB com overflow não alteram o destino") {
         CHECK(m.cpu.last_exception()->code == ExceptionCode::Overflow);
         CHECK_EQ(m.cpu.last_exception()->epc, Machine::code_base);
         CHECK_EQ(m.reg(t2), u32{0xDEAD});
-        CHECK_EQ(m.cpu.pc(), Machine::code_base);
-        CHECK(m.cpu.halted());
+        CHECK_EQ(m.cpu.pc(), Machine::exception_vector); // desviou ao tratador
+        CHECK_EQ(m.cpu.cop0().epc(), Machine::code_base);
+        CHECK(!m.cpu.halted());
     }
 }
 

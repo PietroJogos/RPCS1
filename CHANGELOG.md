@@ -2,6 +2,21 @@
 
 Formato baseado em "Keep a Changelog". Versões seguem SemVer; antes da 0.1.0 todas são pré-lançamentos.
 
+## [0.0.4] — 15/11/2026 — pré-alfa (Fase 4)
+
+### Adicionado
+- COP0: SR, CAUSE, EPC, BadVaddr, TAR, PRID e registradores de depuração; MFC0/MTC0/RFE.
+- Despacho de exceções aos vetores; interrupções de hardware e de software; modo usuário.
+- I-cache (256 linhas, tag física) e isolamento de cache usado pela BIOS para limpá-la.
+- Controlador de interrupções (I_STAT/I_MASK) e a classe `Console` que interliga os componentes.
+- Opção `--cpu-steps`; 36 testes novos.
+
+### Alterado
+- Exceções agora desviam ao tratador em vez de parar a CPU.
+
+### Não incluído
+- GTE, timers, DMA, GPU, SPU, CD-ROM e demais periféricos; temporização de memória.
+
 ## [0.0.3] — 15/11/2026 — pré-alfa (Fase 3)
 
 ### Adicionado

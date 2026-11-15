@@ -1,36 +1,36 @@
-// Interpretador da CPU MIPS R3000A do PlayStation (Fase 3).
+// Interpretador da CPU MIPS R3000A do PlayStation.
 //
-// Implementa o conjunto de instruções sem coprocessadores: ALU, deslocamentos, loads e
-// stores (inclusive LWL/LWR/SWL/SWR), desvios e saltos com delay slot, load delay slot,
-// MULT/DIV com HI/LO e sua latência, SYSCALL/BREAK e detecção de todas as exceções
-// geradas por essas instruções.
+// Fase 3: conjunto de instruções sem coprocessadores, delay slot de desvio, load delay slot,
+//         MULT/DIV com latência, detecção de exceções.
+// Fase 4: COP0 (SR, CAUSE, EPC, BadVaddr, TAR, PRID, registradores de depuração),
+//         MFC0/MTC0/RFE, despacho das exceções aos vetores, interrupções (CAUSE bit 10 e
+//         interrupções de software), modo usuário, verificação de CU0–CU3, I-cache e
+//         isolamento de cache (SR.IsC).
 //
-// Limites desta fase (documentados em docs/PROGRESS.md):
-//   - Exceções são DETECTADAS e registradas com EPC/BD/BT/BadVaddr corretos, mas o desvio
-//     para o vetor de exceção, SR/CAUSE/EPC no COP0 e RFE pertencem à Fase 4. Até lá a CPU
-//     para (`halted()`) na instrução que gerou a exceção.
-//   - Instruções de coprocessador (COP0–3, LWCn, SWCn) param a CPU como "não implementadas"
-//     (COP0: Fase 4; COP2/GTE: Fase 9).
-//   - A contagem de ciclos considera 1 ciclo por instrução + bloqueios de MFHI/MFLO.
-//     Tempos de acesso à memória, I-cache e fila de escrita entram na Fase 5.
+// Limites atuais (docs/PROGRESS.md):
+//   - COP2/GTE (COP2, LWC2, SWC2 com CU2 = 1) para a CPU como "não implementado" (Fase 9).
+//   - Breakpoints de hardware (BPC/BDA/DCIC) são armazenados, mas não disparam (Fase 23).
+//   - Ciclos: 1 por instrução + bloqueios de MFHI/MFLO. Memória/cache: Fase 5.
 #pragma once
 
 #include <array>
 #include <optional>
-#include <string>
 #include <string_view>
 
 #include "bus/bus.hpp"
 #include "core/types.hpp"
+#include "cpu/cop0.hpp"
+#include "cpu/icache.hpp"
 #include "cpu/instruction.hpp"
+#include "cpu/interrupt_line.hpp"
 
 namespace rpcs1::cpu {
 
 // Códigos de exceção (CAUSE.ExcCode).
 enum class ExceptionCode : u8 {
     Interrupt = 0x00,
-    AddressErrorLoad = 0x04,  // AdEL: leitura/busca desalinhada
-    AddressErrorStore = 0x05, // AdES: escrita desalinhada
+    AddressErrorLoad = 0x04,  // AdEL: leitura/busca desalinhada ou fora do KUSEG em modo usuário
+    AddressErrorStore = 0x05, // AdES: escrita desalinhada ou fora do KUSEG em modo usuário
     BusErrorInstruction = 0x06,
     BusErrorData = 0x07,
     Syscall = 0x08,
@@ -44,12 +44,13 @@ enum class ExceptionCode : u8 {
 
 struct ExceptionRecord {
     ExceptionCode code = ExceptionCode::Interrupt;
-    u32 instruction_address = 0; // endereço da instrução que gerou a exceção
+    u32 instruction_address = 0; // instrução que gerou a exceção (ou que seria executada)
     u32 epc = 0;                 // = instruction_address, ou o desvio anterior se em delay slot
     bool branch_delay = false;   // CAUSE.BD
     bool branch_taken = false;   // CAUSE.BT (só com BD)
-    u32 branch_target = 0;       // COP0 TAR (só com BD)
+    u32 branch_target = 0;       // TAR (só com BD e BT)
     std::optional<u32> bad_vaddr; // somente AdEL/AdES
+    u8 coprocessor = 0;          // CAUSE.CE (só CpU)
 };
 
 struct UnimplementedRecord {
@@ -60,16 +61,14 @@ struct UnimplementedRecord {
 
 enum class StepResult : u8 {
     Executed,      // instrução executada normalmente
-    Exception,     // exceção detectada (ver last_exception())
-    Unimplemented, // instrução que depende de componente ainda inexistente
+    Exception,     // exceção ou interrupção atendida: o PC agora está no vetor
+    Unimplemented, // instrução que depende de componente ainda inexistente (CPU parada)
     Halted,        // CPU parada; nada foi executado
 };
 
 class Cpu {
 public:
     static constexpr u32 reset_vector = 0xBFC00000;
-
-    // Latências (psx-spx, "Multiply/divide"): MULT/MULTU dependem apenas de rs.
     static constexpr u32 div_latency = 36;
 
     explicit Cpu(bus::Bus& bus);
@@ -77,23 +76,32 @@ public:
     Cpu(const Cpu&) = delete;
     Cpu& operator=(const Cpu&) = delete;
 
-    // PC = BFC00000h. ⚠️ GPRs, HI e LO após o reset não são documentados: o RPCS1 os zera.
+    // PC = BFC00000h; COP0 e I-cache reiniciados. ⚠️ GPRs, HI e LO são zerados (D-023).
     void reset();
 
+    // Linha de interrupção de hardware (controlador I_STAT/I_MASK). Pode ser nula.
+    void set_interrupt_line(const InterruptLine* line) noexcept { irq_line_ = line; }
+
     StepResult step();
-    // Executa até `max_instructions` instruções ou até parar. Retorna o número executado.
-    u64 run(u64 max_instructions);
+    // Executa até `max_steps` passos ou até a CPU parar (exceções não param a execução).
+    // Retorna o número de instruções executadas.
+    u64 run(u64 max_steps);
 
     [[nodiscard]] u32 gpr(u32 index) const noexcept { return regs_[index & 31]; }
     void set_gpr(u32 index, u32 value) noexcept;
     [[nodiscard]] u32 pc() const noexcept { return pc_; }
-    // Define o PC da próxima instrução (fora de qualquer delay slot).
     void set_pc(u32 address) noexcept;
     [[nodiscard]] u32 hi() const noexcept { return hi_; }
     [[nodiscard]] u32 lo() const noexcept { return lo_; }
 
+    [[nodiscard]] Cop0& cop0() noexcept { return cop0_; }
+    [[nodiscard]] const Cop0& cop0() const noexcept { return cop0_; }
+    [[nodiscard]] const InstructionCache& icache() const noexcept { return icache_; }
+    [[nodiscard]] bool irq_line() const noexcept { return irq_line_ && irq_line_->irq_asserted(); }
+
     [[nodiscard]] u64 cycles() const noexcept { return cycles_; }
     [[nodiscard]] u64 instructions() const noexcept { return instructions_; }
+    [[nodiscard]] u64 exceptions_taken() const noexcept { return exceptions_; }
 
     [[nodiscard]] bool halted() const noexcept { return halted_; }
     [[nodiscard]] const std::optional<ExceptionRecord>& last_exception() const noexcept {
@@ -103,7 +111,6 @@ public:
         return last_unimplemented_;
     }
 
-    // Latência de MULT/MULTU para um dado rs (6, 9 ou 13 ciclos).
     [[nodiscard]] static u32 mult_latency(u32 rs, bool is_signed) noexcept;
 
 private:
@@ -114,16 +121,22 @@ private:
 
     enum class Flow : u8 { Continue, Exception, Unimplemented };
 
+    Flow fetch_and_execute();
     Flow execute(Instruction instr);
     Flow execute_special(Instruction instr);
+    Flow execute_cop0(Instruction instr);
+    Flow execute_coprocessor(Instruction instr);
     Flow execute_load(Instruction instr);
     Flow execute_store(Instruction instr);
 
-    // Escrita imediata (ALU, link): cancela uma carga pendente do mesmo registrador.
+    // Acesso a dados: alinhamento, modo usuário, isolamento de cache e barramento.
+    Flow load_data(bus::AccessWidth width, u32 address, u32& value);
+    Flow store_data(bus::AccessWidth width, u32 address, u32 value);
+    [[nodiscard]] bool isolated(u32 address) const noexcept;
+    [[nodiscard]] u32 bcc() noexcept { return bus_.memory_control().cache_control(); }
+
     void write_reg(u32 index, u32 value) noexcept;
-    // Carga: o valor só fica visível após a próxima instrução (load delay slot).
     void schedule_load(u32 index, u32 value) noexcept;
-    // Valor de rt visto por LWL/LWR: inclui uma carga pendente do mesmo registrador.
     [[nodiscard]] u32 merge_source(u32 index) const noexcept;
 
     void branch(u32 target) noexcept;
@@ -131,34 +144,38 @@ private:
     void wait_hilo() noexcept;
 
     Flow raise(ExceptionCode code, std::optional<u32> bad_vaddr = std::nullopt);
+    Flow raise_unusable(u32 coprocessor);
     Flow unimplemented(Instruction instr, int phase);
     Flow fault_from_bus(bus::BusFault fault, bool store, u32 address);
 
     bus::Bus& bus_;
+    const InterruptLine* irq_line_ = nullptr;
+    Cop0 cop0_;
+    InstructionCache icache_;
 
     std::array<u32, 32> regs_{};
     u32 hi_ = 0;
     u32 lo_ = 0;
     u64 hilo_ready_cycle_ = 0;
 
-    u32 pc_ = reset_vector;       // instrução a executar agora
+    u32 pc_ = reset_vector;
     u32 next_pc_ = reset_vector + 4;
 
-    // Delay slot: a instrução em pc_ está no delay slot de um desvio?
     bool next_in_delay_slot_ = false;
     bool next_branch_taken_ = false;
     u32 next_branch_target_ = 0;
 
-    // Estado da instrução em execução.
     u32 current_pc_ = 0;
     bool current_in_delay_slot_ = false;
     bool current_branch_taken_ = false;
     u32 current_branch_target_ = 0;
-    PendingLoad incoming_load_{}; // carga da instrução anterior (aplicada ao fim desta)
-    PendingLoad pending_load_{};  // carga desta instrução (aplicada ao fim da próxima)
+    PendingLoad incoming_load_{};
+    PendingLoad pending_load_{};
+    u8 pending_coprocessor_ = 0;
 
     u64 cycles_ = 0;
     u64 instructions_ = 0;
+    u64 exceptions_ = 0;
 
     bool halted_ = false;
     std::optional<ExceptionRecord> last_exception_;

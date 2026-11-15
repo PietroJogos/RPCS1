@@ -9,7 +9,7 @@ inline constexpr int patch = @PROJECT_VERSION_PATCH@;
 inline constexpr const char* string = "@PROJECT_VERSION@";
 inline constexpr const char* product = "RPCS1";
 inline constexpr const char* developer = "PiStudio BR";
-// Estágio honesto do projeto: nenhum componente do console está emulado ainda.
-inline constexpr const char* stage = "pré-alfa (Fase 3 — CPU sem COP0; sem vídeo e áudio)";
+// Estágio honesto do projeto (o que ainda falta para rodar software de PS1).
+inline constexpr const char* stage = "pré-alfa (Fase 4 — CPU com COP0; sem vídeo e áudio)";
 
 } // namespace rpcs1::version

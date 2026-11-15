@@ -78,7 +78,7 @@ ExitCode Application::run(std::span<const std::string> args) {
               model_info(settings_.model).name, to_string(settings_.effective_region()),
               settings_.bios_path.empty() ? std::string("(não configurada)")
                                           : unicode::path_to_utf8(settings_.bios_path));
-    initialize_hardware();
+    initialize_hardware(cl);
 
     if (cl.headless) {
         log::info(Category::Frontend, "Modo headless: inicialização concluída, encerrando.");
@@ -148,65 +148,64 @@ void Application::configure_logging(const CommandLine& cl) {
     log::info(Category::Core, "Log em arquivo: {}", unicode::path_to_utf8(path));
 }
 
-void Application::initialize_hardware() {
-    bus_ = std::make_unique<bus::Bus>();
-    cpu_ = std::make_unique<cpu::Cpu>(*bus_);
+void Application::initialize_hardware(const CommandLine& cl) {
+    console_ = std::make_unique<system::Console>();
     log::info(Category::Bus,
-              "Barramento pronto: RAM 2 MiB, scratchpad 1 KiB, BIOS ROM 512 KiB, Memory Control");
+              "Console pronto: RAM 2 MiB, scratchpad 1 KiB, BIOS ROM 512 KiB, Memory Control, "
+              "CPU R3000A com COP0 e I-cache, controlador de interrupções");
 
-    // Honestidade sobre o estado: a CPU existe, mas sem COP0, GTE e periféricos.
+    // Honestidade sobre o estado: só a CPU e o núcleo do sistema existem.
     log::warn(Category::Core,
-              "Fase 3: CPU R3000A (interpretador) emulada, sem COP0/exceções (Fase 4) e sem GTE; "
-              "GPU, SPU, CD-ROM e demais periféricos ainda não existem.");
+              "Fase 4: CPU com COP0, exceções, interrupções e I-cache emulados; sem GTE (Fase 9). "
+              "GPU, SPU, CD-ROM, DMA, timers e demais periféricos ainda não existem.");
 
     if (settings_.bios_path.empty()) {
         log::info(Category::Bios, "Nenhuma BIOS configurada ([BIOS] path); a CPU não será executada.");
         return;
     }
     const auto path = resolve_path(config_path_.parent_path(), settings_.bios_path);
-    if (auto loaded = bus_->bios().load_file(path); !loaded) {
+    if (auto loaded = console_->load_bios(path); !loaded) {
         log::error(Category::Bios, "BIOS não carregada: {}", loaded.error().describe());
         return;
     }
     log::info(Category::Bios, "BIOS mapeada em BFC00000h; primeira instrução: {:08X}h",
-              bus_->fetch_instruction(0xBFC00000).value);
-    run_bios_until_stop();
+              console_->bus().fetch_instruction(0xBFC00000).value);
+    run_bios_until_stop(cl.cpu_steps.value_or(default_cpu_steps));
 }
 
-void Application::run_bios_until_stop() {
+void Application::run_bios_until_stop(u64 limit) {
     // Executa a BIOS real do usuário até a primeira instrução que dependa de um componente
     // ainda inexistente. Nada é simulado: o resultado reflete exatamente o que foi emulado.
-    constexpr u64 limit = 50'000'000;
+    cpu::Cpu& cpu = console_->cpu();
     const auto start = std::chrono::steady_clock::now();
-    const u64 executed = cpu_->run(limit);
+    const u64 executed = cpu.run(limit);
     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::steady_clock::now() - start)
                         .count();
-    log::info(Category::Cpu, "CPU executou {} instruções da BIOS ({} ciclos, {} ms).", executed,
-              cpu_->cycles(), ms);
+    log::info(Category::Cpu,
+              "CPU executou {} instruções da BIOS ({} ciclos, {} exceções/interrupções, {} ms).",
+              executed, cpu.cycles(), cpu.exceptions_taken(), ms);
 
-    if (const auto& unimpl = cpu_->last_unimplemented(); cpu_->halted() && unimpl) {
+    if (const auto& unimpl = cpu.last_unimplemented(); cpu.halted() && unimpl) {
         log::warn(Category::Cpu,
                   "Execução interrompida em {:08X}h: a instrução requer a Fase {}. "
                   "É o limite atual da emulação, não um erro da BIOS.",
                   unimpl->instruction_address, unimpl->phase);
-    } else if (const auto& ex = cpu_->last_exception(); cpu_->halted() && ex) {
-        log::warn(Category::Cpu,
-                  "Exceção {} em {:08X}h (EPC {:08X}h). O despacho de exceções é a Fase 4.",
-                  cpu::to_string(ex->code), ex->instruction_address, ex->epc);
     } else {
-        log::info(Category::Cpu, "Limite de {} instruções atingido; PC = {:08X}h.", limit,
-                  cpu_->pc());
+        log::info(Category::Cpu, "Limite de {} passos atingido; PC = {:08X}h.", limit, cpu.pc());
     }
-    if (const auto post = bus_->post_code()) {
+    if (const auto& ex = cpu.last_exception()) {
+        log::info(Category::Cpu, "Última exceção: {} em {:08X}h (EPC {:08X}h).",
+                  cpu::to_string(ex->code), ex->instruction_address, ex->epc);
+    }
+    if (const auto post = console_->bus().post_code()) {
         log::info(Category::Bios, "Último código POST: {:X}h", *post);
     }
 }
-
 ExitCode Application::run_window_loop(const CommandLine& cl) {
     video::WindowConfig config;
     config.title = std::string(version::product) + " " + version::string +
-                   " — pré-alfa: nada é executado ainda";
+                   " — pré-alfa (sem vídeo ainda)";
     config.client_width = nominal_width * settings_.window_scale;
     config.client_height = nominal_height * settings_.window_scale;
 

@@ -109,8 +109,25 @@ constexpr u32 bcondz_raw(u32 rs, u32 rt_field, s32 off) {
 constexpr u32 j(u32 target_address) { return j_type(cpu::op::j, target_address); }
 constexpr u32 jal(u32 target_address) { return j_type(cpu::op::jal, target_address); }
 
-// Coprocessadores (apenas para testar o tratamento de instruções ainda não implementadas).
-constexpr u32 mfc0(u32 rt, u32 rd) { return i_type(cpu::op::cop0, 0x00, rt, (rd & 31) << 11); }
-constexpr u32 rfe() { return 0x42000010; }
+// Coprocessadores.
+constexpr u32 cop_move(u32 cop, u32 sub, u32 rt, u32 rd) {
+    return (cpu::op::cop0 + (cop & 3)) << 26 | (sub & 31) << 21 | (rt & 31) << 16 | (rd & 31) << 11;
+}
+constexpr u32 mfc0(u32 rt, u32 rd) { return cop_move(0, 0x00, rt, rd); }
+constexpr u32 mtc0(u32 rt, u32 rd) { return cop_move(0, 0x04, rt, rd); }
+constexpr u32 cfc0(u32 rt, u32 rd) { return cop_move(0, 0x02, rt, rd); }
+constexpr u32 mfc2(u32 rt, u32 rd) { return cop_move(2, 0x00, rt, rd); }
+constexpr u32 cop_command(u32 cop, u32 command) {
+    return (cpu::op::cop0 + (cop & 3)) << 26 | 1u << 25 | (command & 0x01FFFFFF);
+}
+constexpr u32 rfe() { return cop_command(0, 0x10); }
+constexpr u32 tlbr() { return cop_command(0, 0x01); }
+constexpr u32 tlbp() { return cop_command(0, 0x08); }
+constexpr u32 gte_rtps() { return cop_command(2, 0x0180001); }
+
+// Registradores do COP0.
+inline constexpr u32 c0_bpc = 3, c0_bda = 5, c0_tar = 6, c0_dcic = 7, c0_badvaddr = 8,
+                     c0_bdam = 9, c0_bpcm = 11, c0_sr = 12, c0_cause = 13, c0_epc = 14,
+                     c0_prid = 15;
 
 } // namespace rpcs1::test::asm_

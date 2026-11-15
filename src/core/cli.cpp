@@ -81,6 +81,16 @@ Result<CommandLine> parse_command_line(std::span<const std::string> args) {
                                               CommandLine::max_exit_after_ms, value.value()));
             }
             cl.exit_after_ms = static_cast<u32>(*ms);
+        } else if (arg == "--cpu-steps") {
+            auto value = take_value(arg);
+            if (!value) return value.error();
+            const auto steps = strings::parse_unsigned(value.value(), 1, CommandLine::max_cpu_steps);
+            if (!steps) {
+                return make_error(ErrorCode::InvalidArgument,
+                                  std::format("--cpu-steps espera um número de passos (1 a {}): \"{}\"",
+                                              CommandLine::max_cpu_steps, value.value()));
+            }
+            cl.cpu_steps = *steps;
         } else if (strings::starts_with(arg, "-")) {
             return make_error(ErrorCode::InvalidArgument,
                               std::format("opção desconhecida: {}", args[i]));
@@ -105,11 +115,13 @@ std::string usage_text() {
            "      --log-level <n>    trace, debug, info, warn, error, fatal ou off.\n"
            "      --headless         Não abre janela (testes automatizados).\n"
            "      --exit-after <ms>  Encerra automaticamente após <ms> milissegundos.\n"
+           "      --cpu-steps <n>    Limite de passos da CPU ao executar a BIOS\n"
+           "                         (padrão: 50000000).\n"
            "\n"
-           "Estado atual: Fase 3 (CPU). A BIOS configurada é executada pela CPU\n"
-           "emulada até a primeira instrução que dependa de um componente ainda\n"
-           "inexistente (COP0, GTE, periféricos). Não há vídeo nem áudio: a janela\n"
-           "exibe somente uma tela preta sem sinal.\n";
+           "Estado atual: Fase 4 (CPU com COP0, exceções e interrupções). A BIOS\n"
+           "configurada é executada até a primeira instrução que dependa de um\n"
+           "componente inexistente (GTE) ou até o limite de passos. Não há vídeo nem\n"
+           "áudio: a janela exibe somente uma tela preta sem sinal.\n";
 }
 
 } // namespace rpcs1

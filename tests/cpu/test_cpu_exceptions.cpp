@@ -97,27 +97,15 @@ TEST_CASE("cpu/bits não usados não geram exceção") {
     CHECK_EQ(n.reg(t0), u32{4});
 }
 
-TEST_CASE("cpu/instruções de coprocessador param como não implementadas") {
-    struct Case {
-        u32 word;
-        int phase;
-    };
-    const Case cases[] = {
-        {mfc0(t0, 12), 4},
-        {rfe(), 4},
-        {0x4A180001u, 9}, // COP2 (comando da GTE)
-        {(0x32u << 26), 9}, // LWC2
-        {(0x3Au << 26), 9}, // SWC2
-        {(0x11u << 26), 4}, // COP1
-        {(0x38u << 26), 4}, // SWC0
-    };
-    for (const auto& c : cases) {
-        Machine m({nop(), c.word});
+TEST_CASE("cpu/GTE com CU2 ligado para como não implementada (Fase 9)") {
+    for (u32 word : {gte_rtps(), mfc2(t0, 1), (0x32u << 26), (0x3Au << 26)}) {
+        Machine m({nop(), word});
+        m.cpu.cop0().write(cpu::cop0reg::sr, cpu::sr::cu2);
         m.steps(1);
         CHECK(m.cpu.step() == StepResult::Unimplemented);
         REQUIRE(m.cpu.last_unimplemented().has_value());
-        CHECK_EQ(m.cpu.last_unimplemented()->phase, c.phase);
-        CHECK_EQ(m.cpu.last_unimplemented()->word, c.word);
+        CHECK_EQ(m.cpu.last_unimplemented()->phase, 9);
+        CHECK_EQ(m.cpu.last_unimplemented()->word, word);
         CHECK_EQ(m.cpu.pc(), base + 4);
         CHECK(m.cpu.halted());
         CHECK_EQ(m.cpu.cycles(), u64{1}); // só o nop consumiu ciclo
@@ -125,8 +113,9 @@ TEST_CASE("cpu/instruções de coprocessador param como não implementadas") {
 }
 
 TEST_CASE("cpu/CPU parada não executa mais nada") {
-    Machine m({syscall(), addiu(t0, zero, 1)});
-    CHECK(m.cpu.step() == StepResult::Exception);
+    Machine m({gte_rtps(), addiu(t0, zero, 1)});
+    m.cpu.cop0().write(cpu::cop0reg::sr, cpu::sr::cu2);
+    CHECK(m.cpu.step() == StepResult::Unimplemented);
     const u64 cycles = m.cpu.cycles();
     CHECK(m.cpu.step() == StepResult::Halted);
     CHECK(m.cpu.step() == StepResult::Halted);
@@ -139,6 +128,17 @@ TEST_CASE("cpu/CPU parada não executa mais nada") {
     CHECK_EQ(m.cpu.pc(), u32{0xBFC00000});
 }
 
+TEST_CASE("cpu/exceções não param a execução") {
+    Machine m({syscall(), addiu(t0, zero, 1)});
+    m.load({addiu(t1, zero, 2)}, Machine::exception_vector);
+    CHECK(m.cpu.step() == StepResult::Exception);
+    CHECK(!m.cpu.halted());
+    CHECK_EQ(m.cpu.pc(), Machine::exception_vector);
+    CHECK(m.cpu.step() == StepResult::Executed);
+    CHECK_EQ(m.reg(t1), u32{2});
+    CHECK_EQ(m.reg(t0), u32{0}); // a instrução após o SYSCALL não executou
+    CHECK_EQ(m.cpu.exceptions_taken(), u64{1});
+}
 TEST_CASE("cpu/busca de instrução no scratchpad ou em endereço inexistente gera IBE") {
     for (u32 address : {0x1F800000u, 0x9F800010u, 0x00800000u, 0xBFC80000u}) {
         bus::Bus b;

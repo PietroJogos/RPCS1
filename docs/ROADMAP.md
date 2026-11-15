@@ -55,14 +55,16 @@ O estado atual de cada fase fica em [PROGRESS.md](PROGRESS.md); os resultados de
 ## Fase 4 — COP0, exceções e cache → 3
 - **Objetivos:** registradores COP0, pilha IE/KU, `RFE`, exceções (AdEL/AdES/IBE/DBE/Sys/Bp/RI/CpU/Ov/INT),
   EPC/BD em delay slot, BEV, interrupções via CAUSE bit 10, isolamento de cache (SR.IsC) e registrador
-  BCC, I-cache (comportamento observável).
+  BCC, I-cache (comportamento observável), controlador de interrupções I_STAT/I_MASK (antecipado
+  da Fase 5, D-029).
 - **Testes:** cada exceção, em delay slot e fora dele; `SYSCALL`/`BREAK`; mascaramento.
 - **Aceitação:** sequências de teste reproduzem EPC/CAUSE/SR esperados.
 
 ## Fase 5 — Scheduler, timers e sincronização → 4
 - **Objetivos:** agendador de eventos por ciclo (base: clock da CPU), timers 0–2 com todas as fontes
-  e modos de sincronização, controlador de IRQ (I_STAT/I_MASK por borda), eventos de HBLANK/VBLANK
-  derivados do clock de vídeo por região, estado de reset coerente.
+  e modos de sincronização, eventos de HBLANK/VBLANK derivados do clock de vídeo por região
+  (gerando IRQ0 no controlador já existente), tempos de acesso à memória e da I-cache, estado de
+  reset coerente.
 - **Testes:** contagem/alvo/overflow/one-shot/toggle, sincronização com blanks, ordenação de eventos.
 - **Decisão pendente:** modelo de clock de vídeo PAL (ver lacuna nº 1 da documentação).
 

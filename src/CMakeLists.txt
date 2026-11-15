@@ -28,17 +28,21 @@ endif()
 rpcs1_configure_target(rpcs1_core)
 
 # --------------------------------------------------------------------------
-# Hardware emulado — Fase 2: memória (RAM, scratchpad, BIOS ROM, Memory Control)
-# e barramento (segmentos, mapa físico, E/S mapeada, erros de acesso).
+# Hardware emulado: memória e barramento (Fase 2), CPU (Fase 3), COP0, exceções,
+# I-cache e controlador de interrupções (Fase 4) e o Console que os interliga.
 # --------------------------------------------------------------------------
 add_library(rpcs1_hw STATIC
     bus/address.cpp
     bus/bus.cpp
     bus/io_device.cpp
+    cpu/cop0.cpp
     cpu/cpu.cpp
     cpu/disassembler.cpp
+    cpu/icache.cpp
+    interrupts/interrupt_controller.cpp
     memory/bios_rom.cpp
-    memory/memory_control.cpp)
+    memory/memory_control.cpp
+    system/console.cpp)
 target_link_libraries(rpcs1_hw PUBLIC rpcs1_core)
 rpcs1_configure_target(rpcs1_hw)
 

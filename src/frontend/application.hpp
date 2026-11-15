@@ -6,9 +6,8 @@
 #include <span>
 #include <string>
 
-#include "bus/bus.hpp"
-#include "cpu/cpu.hpp"
 #include "core/cli.hpp"
+#include "system/console.hpp"
 #include "core/error.hpp"
 #include "core/log.hpp"
 #include "core/settings.hpp"
@@ -35,16 +34,17 @@ public:
 private:
     [[nodiscard]] Status load_settings(const CommandLine& cl);
     void configure_logging(const CommandLine& cl);
-    void initialize_hardware();
-    void run_bios_until_stop();
+    void initialize_hardware(const CommandLine& cl);
+    void run_bios_until_stop(u64 limit);
+
+    static constexpr u64 default_cpu_steps = 50'000'000;
     [[nodiscard]] ExitCode run_window_loop(const CommandLine& cl);
 
     std::shared_ptr<log::ConsoleSink> console_sink_;
     std::shared_ptr<log::FileSink> file_sink_;
     std::filesystem::path config_path_;
     Settings settings_;
-    std::unique_ptr<bus::Bus> bus_;
-    std::unique_ptr<cpu::Cpu> cpu_;
+    std::unique_ptr<system::Console> console_;
 };
 
 } // namespace rpcs1::frontend

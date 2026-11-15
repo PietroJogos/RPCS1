@@ -11,8 +11,8 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
 | 1 | Documentação técnica | **concluída (1ª versão)** | `HARDWARE_ARCHITECTURE.md`; 11 lacunas registradas para fases futuras |
 | 2 | Memória e barramento | **concluída** | 38 testes novos; 7 comportamentos não documentados adotados e marcados ⚠️ (D-012 a D-017) |
 | 3 | CPU R3000A | **concluída** | Interpretador sem coprocessadores; 56 testes novos; exceções detectadas (despacho na Fase 4) |
-| 4 | COP0, exceções, cache | não iniciada | Próxima fase |
-| 5 | Scheduler e timers | não iniciada | Decisão pendente sobre clock de vídeo PAL |
+| 4 | COP0, exceções, cache | **concluída** | COP0, despacho de exceções, interrupções, I-cache, isolamento e controlador I_STAT/I_MASK; 36 testes novos |
+| 5 | Scheduler e timers | não iniciada | Próxima fase; decisão pendente sobre clock de vídeo PAL |
 | 6 | DMA | não iniciada | |
 | 7 | GPU: registradores e VRAM | não iniciada | |
 | 8 | GPU: renderização | não iniciada | |
@@ -90,15 +90,35 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
 - **Frontend:** a BIOS configurada é executada até a primeira instrução que dependa de um
   componente inexistente; o log informa quantas instruções rodaram e onde parou.
 
+## Fase 4 — o que foi realmente implementado
+
+- **COP0** (`src/cpu/cop0.*`): SR, CAUSE (bits 8–9 graváveis, bit 10 ao vivo), EPC, BadVaddr, TAR,
+  PRID = 2, BPC/BDA/BDAM/BPCM/DCIC (armazenados), máscaras de bits documentadas.
+- **MFC0** (com atraso de uma instrução), **MTC0**, **RFE**; RI para registradores inexistentes e
+  comandos TLB; CpU para LWC0/SWC0, COP0 em modo usuário sem CU0 e COP1/2/3 sem CU.
+- **Despacho de exceções** ao vetor (80000080h ou BFC00180h conforme BEV) com EPC, CAUSE (ExcCode,
+  BD, BT, CE), BadVaddr, TAR e empilhamento de SR. Exceções não param mais a CPU.
+- **Interrupções:** hardware (CAUSE bit 10) e software (bits 8–9), aceitas entre instruções quando
+  IEc e SR.Im permitem; EPC correto em delay slot; carga pendente concluída.
+- **Modo usuário:** AdEL/AdES para acessos e buscas fora do KUSEG.
+- **I-cache** (`src/cpu/icache.*`): 256 linhas, tag física, preenchimento até o fim da linha,
+  IBLKSZ, código obsoleto após escrita na RAM, KSEG1 sem cache.
+- **Isolamento de cache** (SR.IsC) com os modos TAG e IS1 do BCC; a rotina de limpeza no estilo
+  da BIOS invalida a cache sem tocar na RAM (testado).
+- **Controlador de interrupções** (`src/interrupts`): I_STAT/I_MASK em 1F801070h/74h.
+- **`system::Console`** interliga barramento, controlador e CPU; o frontend o utiliza.
+- **CLI:** `--cpu-steps <n>` limita a execução da BIOS.
+
 ## Recursos ausentes (conscientemente)
 
-- COP0 (SR, CAUSE, EPC, vetores, RFE, interrupções) e o desvio ao tratador de exceção — Fase 4.
-  Uma BIOS real para no primeiro `MTC0`/`MFC0`.
-- GTE (COP2), GPU, SPU, CD-ROM, DMA, timers, controlador de IRQ, SIO, controles, Memory Cards.
-- Temporização de memória, I-cache e fila de escrita (Fases 4 e 5).
+- GTE (COP2): uma BIOS real deve chegar mais longe agora, mas para no primeiro comando COP2 ou
+  fica presa esperando periféricos inexistentes (timers, DMA, GPU, CD-ROM...).
+- Disparo de breakpoints de hardware (Fase 23); modos LOCK/INV do BCC.
+- Temporização de memória, da I-cache e da fila de escrita (Fase 5).
+- GPU, SPU, CD-ROM, DMA, timers, SIO, controles, Memory Cards.
 
 ## Próxima dependência técnica
 
-**Fase 4 — COP0, exceções e cache:** registradores SR/CAUSE/EPC/BadVaddr/PRID, `MFC0`/`MTC0`/`RFE`,
-despacho aos vetores usando os `ExceptionRecord` já produzidos pela CPU, interrupções via CAUSE
-bit 10 e isolamento de cache (necessário para a BIOS limpar a I-cache).
+**Fase 5 — scheduler e timers:** agendador de eventos por ciclo, timers 0–2, VBLANK/HBLANK por
+região (IRQ0 no controlador já existente) e tempos de acesso à memória. É a base de tempo que a
+BIOS e todos os periféricos usam.
