@@ -29,7 +29,8 @@ rpcs1_configure_target(rpcs1_core)
 
 # --------------------------------------------------------------------------
 # Hardware emulado: memória e barramento (Fase 2), CPU (Fase 3), COP0, exceções,
-# I-cache e controlador de interrupções (Fase 4) e o Console que os interliga.
+# I-cache e controlador de interrupções (Fase 4), timers e vídeo (Fase 5), DMA (Fase 6),
+# GPU: registradores e VRAM (Fase 7) e o Console que os interliga.
 # --------------------------------------------------------------------------
 add_library(rpcs1_hw STATIC
     bus/address.cpp
@@ -40,6 +41,7 @@ add_library(rpcs1_hw STATIC
     cpu/disassembler.cpp
     cpu/icache.cpp
     dma/dma_controller.cpp
+    gpu/gpu.cpp
     gpu/video_timing.cpp
     interrupts/interrupt_controller.cpp
     memory/bios_rom.cpp
@@ -47,13 +49,15 @@ add_library(rpcs1_hw STATIC
     system/console.cpp
     system/scheduler.cpp
     timers/timers.cpp)
-target_link_libraries(rpcs1_hw PUBLIC rpcs1_core)
+# A GPU entrega a imagem da área de exibição em um video::Framebuffer.
+target_link_libraries(rpcs1_hw PUBLIC rpcs1_core rpcs1_video)
 rpcs1_configure_target(rpcs1_hw)
 
 # --------------------------------------------------------------------------
-# Video do hospedeiro: framebuffer e janela nativa (Win32).
+# Video do hospedeiro: framebuffer, gravação BMP e janela nativa (Win32).
 # --------------------------------------------------------------------------
 add_library(rpcs1_video STATIC
+    video/bmp.cpp
     video/framebuffer.cpp
     video/window.cpp)
 if(WIN32)

@@ -229,6 +229,46 @@ acrescentadas no fim; decisões revistas são marcadas como substituídas, não 
 - Em máquinas com pouca memória livre o MSVC falha com C1060. A opção `RPCS1_MSVC_MP_JOBS`
   (vazio = todos os núcleos, 1 = desliga /MP) permite compilar nesses casos.
 
+## D-040 — Execução instantânea dos comandos da GPU (Fase 7) ⚠️
+- Cada comando GP0 é executado no instante em que sua última palavra chega; não há tempo de
+  execução, o FIFO de 16 palavras nunca enche e GPUSTAT bit 25 com GP1(04h) = 1 ("FIFO não cheio")
+  fica sempre ligado. Os bits 26 e 28 caem só enquanto um comando está incompleto (bit 28: só
+  polígonos e linhas) ou durante uma transferência A0h (bit 26).
+- Motivo: os tempos de desenho e de transferência dependem do rasterizador (Fase 8) e da
+  sincronização fina (Fase 20); um tempo inventado agora seria um palpite.
+
+## D-041 — GPU emulada: versão 2 (Fase 7)
+- O SCPH-5501 usa a GPU "nova" (208 pinos). Adotado o comportamento v2: GP1(10h–1Fh) com índice nos
+  bits 0–3, versão = 2 no índice 7, índice 8 = 0, demais índices mantêm o GPUREAD; GPUSTAT bit 14
+  (espelhamento, só v1) = 0; GP1(20h) sem efeito; bit 13 = 1 sem entrelaçamento.
+- GP1(09h) (bit 0 = endereços Y de 512 a 1023, VRAM de 2 MiB) é armazenado e não é alterado por
+  GP1(00h); sem efeito com 1 MiB, em que Y já dá a volta em 512.
+- GP0(E1h) bit 11 (base Y 2 da textura) aparece no GPUSTAT bit 15. ⚠️ Armazenado mesmo com
+  GP1(09h) = 0 (as fontes não dizem se é mascarado).
+
+## D-042 — Pontos não documentados das transferências e da exibição ⚠️
+- Cópia 80h feita pixel a pixel, linha por linha: com origem e destino sobrepostos o hardware copia
+  em blocos e o resultado pode diferir.
+- C0h com total ímpar de pixels: a metade alta da última palavra lida é 0. A0h com total ímpar: a
+  metade alta da última palavra é descartada (documentado).
+- GP1(00h) abandona uma leitura C0h pendente; GP1(01h) a mantém.
+- SB/SH em GP0/GP1: o registrador inteiro da CPU é tratado como a palavra escrita (mesma regra do
+  barramento, D-015). Leituras de GPUREAD de 8/16 bits avançam a transferência a cada acesso.
+- Largura exibida: `(((X2 − X1) / divisor) + 2) AND NOT 3` (psx-spx), com X2 limitado ao fim da linha
+  (3413/3406 ciclos) e Y2 ao fim do quadro (263/314 linhas); 480 linhas só com entrelaçamento.
+- Imagem de 24 bits: fluxo de bytes R, G, B a partir de X × 2 (X em halfwords).
+- GPUSTAT bit 31 sem entrelaçamento = paridade da linha atual; com 480i = campo; 0 no VBLANK.
+- O reset do console reinicia a GPU como GP1(00h) e preserva a VRAM; ao ligar, a VRAM é zerada
+  (o conteúdo real é indefinido).
+
+## D-043 — Saída de imagem da Fase 7
+- A janela mostra a área de exibição da VRAM no estado em que a execução da CPU terminou; a emulação
+  não continua com a janela aberta (laço em tempo real e frame pacing: Fase 20).
+- `--dump-frame <arq>` grava essa imagem em BMP de 24 bits. O teste `smoke.gpu_frame` confere o BMP
+  gerado por um programa MIPS próprio pixel a pixel e por SHA-256 (regressão).
+- Comandos de desenho (20h–7Fh) são consumidos com o número exato de palavras e descartados com um
+  aviso por opcode, para que nada pareça desenhado sem ter sido.
+
 ## D-010 — MSVC como compilador de referência
 - **Decisão:** Visual Studio 2022 (MSVC 19.44) é o compilador verificado. O código evita
   extensões específicas, mas nenhum outro compilador foi testado ainda (o MinGW disponível na

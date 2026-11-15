@@ -14,8 +14,8 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
 | 4 | COP0, exceções, cache | **concluída** | COP0, despacho de exceções, interrupções, I-cache, isolamento e controlador I_STAT/I_MASK; 36 testes novos |
 | 5 | Scheduler e timers | **concluída** | Scheduler, temporização de vídeo (IRQ0) e timers validados contra medições do SCPH-5501; 31 testes novos; 2 divergências de 1 linha registradas (D-033); tempos de memória movidos para a Fase 20 |
 | 6 | DMA | **concluída** | 7 canais, burst/slice/lista/OTC, DPCR/DICR/IRQ3 validados contra medições do SCPH-5501; 19 testes novos; CPU não paralisada durante o DMA (D-036) |
-| 7 | GPU: registradores e VRAM | não iniciada | Próxima fase |
-| 8 | GPU: renderização | não iniciada | |
+| 7 | GPU: registradores e VRAM | **concluída** | GP0/GP1, GPUSTAT, VRAM, preenchimento, cópias e transferências (CPU e DMA), exibição 15/24 bits; programa de teste gera imagem conferida pixel a pixel; 26 testes novos; desenho de primitivas descartado com aviso (Fase 8) |
+| 8 | GPU: renderização | não iniciada | Próxima fase |
 | 9 | GTE | não iniciada | |
 | 10 | MDEC | não iniciada | |
 | 11 | SPU | não iniciada | |
@@ -142,10 +142,38 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
   SPU e porta de expansão.
 - **Build:** opção `RPCS1_MSVC_MP_JOBS` para compilar com pouca memória livre.
 
+## Fase 7 — o que foi realmente implementado
+
+- **VRAM** (`src/gpu/vram.hpp`): 1024 × 512 pixels de 16 bits, volta nas bordas, conversões de cor.
+- **GPU** (`src/gpu/gpu.hpp`): GP0/GPUREAD em 1F801810h e GP1/GPUSTAT em 1F801814h.
+  - Todos os comandos GP0 são montados com o número exato de palavras (inclusive polilinhas e o
+    marcador 5000_5000h, nunca antes do 2º vértice), então o FIFO não se desalinha mesmo com os
+    comandos de desenho, que nesta fase são **descartados com aviso** (Fase 8).
+  - Preenchimento 02h (passo de 16 em X, largura arredondada, sem máscara), cópia 80h, CPU→VRAM
+    A0h e VRAM→CPU C0h, com as regras de máscara de E6h e tamanho 0 = máximo.
+  - Atributos E1h–E6h (bit 11 de E1h = base Y 2 da textura, GPUSTAT 15); GP1(09h) armazenado (sem
+    efeito com 1 MiB); IRQ1 por GP0(1Fh), reconhecido por GP1(02h).
+  - Todos os comandos GP1 (00h–09h, 10h–1Fh da GPU v2, espelhos 40h–FFh); GPUSTAT completo (vale
+    14802000h após o reset).
+  - Canal 2 de DMA: DREQ conforme GP1(04h) (medido no SCPH-5501); a CPU avisa o DMA quando o DREQ
+    muda (ex.: C0h com o canal já armado).
+  - GP1(06h/07h/08h) alimentam a temporização de vídeo da Fase 5 (modo, entrelaçamento, divisor).
+  - Imagem da área de exibição em 15 e 24 bits (`render_display`), preta com a exibição desligada.
+- **Console:** GPU ligada ao barramento e ao canal 2; o reset reinicia a GPU e preserva a VRAM.
+- **Frontend:** a janela mostra a área de exibição da VRAM ao fim da execução; `--dump-frame <arq>`
+  grava a imagem em BMP (`src/video/bmp.hpp`); o log resume o estado da GPU.
+- **Programa de teste** (`rpcs1_make_test_bios --gpu`, código MIPS próprio): configura a exibição,
+  preenche retângulos, envia um preenchimento por DMA, um triângulo (descartado), transfere e copia
+  pixels; o teste `smoke.gpu_frame` confere 31 pixels do BMP gerado.
+
 ## Recursos ausentes (conscientemente)
 
-- GTE (COP2); GPU (comandos, VRAM, GPUSTAT), SPU, CD-ROM, MDEC, SIO, controles, Memory Cards —
-  seus canais de DMA já existem, mas os dispositivos ainda são marcadores.
+- Desenho de polígonos, linhas e retângulos, texturas, CLUT, semitransparência, dithering, área e
+  deslocamento de desenho (Fase 8); tempo de execução dos comandos, limite de 16 palavras do FIFO e
+  cópia em blocos com sobreposição (D-040, D-042).
+- Laço de emulação em tempo real com a janela aberta (Fase 20): a janela mostra o estado final.
+- GTE (COP2); SPU, CD-ROM, MDEC, SIO, controles, Memory Cards — seus canais de DMA já existem, mas
+  os dispositivos ainda são marcadores.
 - Paralisação da CPU durante o DMA, efeito do chopping no tempo e ritmo real de cada dispositivo
   (D-036); tempos de acesso à memória (Fase 20).
 - Calibração fina de 1 linha nos timers sincronizados ao VBLANK (D-033).
@@ -153,6 +181,7 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
 
 ## Próxima dependência técnica
 
-**Fase 7 — GPU: registradores e VRAM:** GP0/GP1, FIFO, VRAM de 1 MiB, GPUSTAT, cópias CPU↔VRAM
-(inclusive pelo canal 2 de DMA, que já existe) e saída da área de exibição para a janela. É o primeiro
-passo para que a BIOS produza imagem.
+**Fase 8 — GPU: renderização:** rasterização de triângulos e quadriláteros (planos, gouraud e
+texturizados com CLUT de 4/8 bits e 15 bits diretos), linhas e polilinhas, retângulos, área e
+deslocamento de desenho, semitransparência, dithering, janela de textura e bit de máscara. Os comandos
+já chegam inteiros e alinhados ao ponto em que hoje são descartados (`Gpu::discard_draw`).

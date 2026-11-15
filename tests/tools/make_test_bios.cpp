@@ -1,11 +1,19 @@
 // Gera uma BIOS SINTÉTICA de 512 KiB para testes de fumaça. Não contém nenhum código
-// da Sony: é um programa mínimo montado pelo codificador de testes do RPCS1.
+// da Sony: são programas mínimos montados pelo codificador de testes do RPCS1.
 //
-// Programa (em BFC00000h; após o reset SR.BEV = 1, então exceções vão para BFC00180h):
+// Programa padrão (em BFC00000h; após o reset SR.BEV = 1, então exceções vão para BFC00180h):
 //   POST = 7; SYSCALL → tratador (POST = 8, retorna para EPC + 4 com RFE);
 //   POST = 9; liga CU2 e executa um comando da GTE — que só existirá na Fase 9.
 // Instruções executadas: 4 + 7 (tratador) + 5 = 16, com 1 exceção.
+//
+// Programa --gpu (Fase 7): configura a exibição 320×240 NTSC de 15 bits pela GP1, preenche
+// retângulos coloridos com GP0(02h), envia um preenchimento por DMA (canal 2, lista
+// encadeada na RAM), envia um triângulo (descartado até a Fase 8), transfere 4×2 pixels da
+// CPU para a VRAM (A0h), copia-os dentro da VRAM (80h), liga a exibição e fica em laço.
+// POST = 1 no início e 2 ao final. O conteúdo esperado da imagem está em
+// tests/smoke/gpu_frame.cmake.
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <vector>
 
@@ -24,14 +32,7 @@ void place(std::vector<u8>& image, u32 offset, const std::vector<u32>& words) {
     }
 }
 
-} // namespace
-
-int main(int argc, char** argv) {
-    if (argc != 2) {
-        std::fprintf(stderr, "uso: rpcs1_make_test_bios <saida.bin>\n");
-        return 2;
-    }
-    std::vector<u8> image(512 * 1024, 0);
+void default_program(std::vector<u8>& image) {
     place(image, 0x000, {
         lui(t0, 0x1F80),
         ori(t0, t0, 0x2041),
@@ -54,7 +55,96 @@ int main(int argc, char** argv) {
         jr(k0),
         rfe(),
     });
-    std::ofstream out(argv[1], std::ios::binary);
+}
+
+class Program {
+public:
+    void li(u32 reg, u32 value) {
+        code.push_back(lui(reg, value >> 16));
+        code.push_back(ori(reg, reg, value & 0xFFFFu));
+    }
+    void gp0(u32 value) { li(t2, value); code.push_back(sw(t2, 0, t0)); }
+    void gp1(u32 value) { li(t2, value); code.push_back(sw(t2, 0, t1)); }
+    void store(u32 address, u32 value) {
+        li(t3, address);
+        li(t2, value);
+        code.push_back(sw(t2, 0, t3));
+    }
+    void post(u32 value) {
+        li(t3, 0x1F802041);
+        code.push_back(addiu(t2, zero, static_cast<s32>(value)));
+        code.push_back(sb(t2, 0, t3));
+    }
+    std::vector<u32> code;
+};
+
+void gpu_program(std::vector<u8>& image) {
+    Program p;
+    p.li(t0, 0x1F801810); // GP0
+    p.li(t1, 0x1F801814); // GP1
+    p.post(1);
+
+    p.gp1(0x00000000); // reset da GPU
+    p.gp1(0x08000001); // 320 pontos, NTSC, 15 bits, sem entrelaçamento
+    p.gp1(0x06C60260); // X1 = 260h, X2 = C60h (2560 ciclos de vídeo = 320 × 8)
+    p.gp1(0x07040010); // Y1 = 10h, Y2 = 100h (240 linhas)
+    p.gp1(0x05000000); // início da exibição na VRAM: (0, 0)
+
+    p.gp0(0x02400000); p.gp0(0x00000000); p.gp0(0x00F00140); // fundo azul-escuro 320×240
+    p.gp0(0x020000FF); p.gp0(0x00100010); p.gp0(0x00400060); // vermelho (16,16) 96×64
+    p.gp0(0x0200FF00); p.gp0(0x00100070); p.gp0(0x00400060); // verde (112,16)
+    p.gp0(0x02FF0000); p.gp0(0x001000D0); p.gp0(0x00400060); // azul (208,16)
+
+    // Lista encadeada na RAM (00001000h): 1 nó com um preenchimento branco (16,96) 288×16.
+    p.store(0x00001000, 0x03FFFFFF);
+    p.store(0x00001004, 0x02FFFFFF);
+    p.store(0x00001008, 0x00600010);
+    p.store(0x0000100C, 0x00100120);
+    p.gp1(0x04000002);                 // DMA: CPU → GP0
+    p.li(t3, 0x1F8010F0);              // DPCR |= 800h (habilita o canal 2)
+    p.code.push_back(lw(t4, 0, t3));
+    p.code.push_back(nop());
+    p.code.push_back(ori(t4, t4, 0x0800));
+    p.code.push_back(sw(t4, 0, t3));
+    p.store(0x1F8010A0, 0x00001000);   // MADR2
+    p.store(0x1F8010A4, 0x00000000);   // BCR2
+    p.store(0x1F8010A8, 0x01000401);   // CHCR2: para o dispositivo, lista, iniciar
+
+    // Triângulo que cobriria a tela: descartado até a Fase 8 (o FIFO continua alinhado).
+    p.gp0(0x20FFFFFF); p.gp0(0x00000000); p.gp0(0x00EF0000); p.gp0(0x00EF013F);
+    p.gp0(0x02808080); p.gp0(0x00800010); p.gp0(0x00300120); // cinza (16,128) 288×48
+
+    // CPU → VRAM: 4×2 pixels em (32,176).
+    p.gp0(0xA0000000); p.gp0(0x00B00020); p.gp0(0x00020004);
+    p.gp0(0x03E0001F); // vermelho, verde
+    p.gp0(0x7FFF7C00); // azul, branco
+    p.gp0(0x7FE003FF); // amarelo, ciano
+    p.gp0(0x00007C1F); // magenta, preto
+    // VRAM → VRAM: copia o bloco para (64,176).
+    p.gp0(0x80000000); p.gp0(0x00B00020); p.gp0(0x00B00040); p.gp0(0x00020004);
+
+    p.gp1(0x03000000); // liga a exibição
+    p.post(2);
+    p.code.push_back(beq(zero, zero, -1)); // laço infinito
+    p.code.push_back(nop());
+    place(image, 0x000, p.code);
+}
+
+} // namespace
+
+int main(int argc, char** argv) {
+    const bool gpu = argc == 3 && std::strcmp(argv[1], "--gpu") == 0;
+    if (argc != 2 && !gpu) {
+        std::fprintf(stderr, "uso: rpcs1_make_test_bios [--gpu] <saida.bin>\n");
+        return 2;
+    }
+    std::vector<u8> image(512 * 1024, 0);
+    if (gpu) {
+        gpu_program(image);
+    } else {
+        default_program(image);
+    }
+    std::ofstream out(argv[argc - 1], std::ios::binary);
     out.write(reinterpret_cast<const char*>(image.data()), static_cast<std::streamsize>(image.size()));
     return out ? 0 : 1;
 }

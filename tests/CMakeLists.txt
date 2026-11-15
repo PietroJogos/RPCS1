@@ -27,9 +27,11 @@ add_executable(rpcs1_tests
     memory/test_memory_block.cpp
     memory/test_memory_control.cpp
     dma/test_dma.cpp
+    gpu/test_gpu.cpp
     gpu/test_video_timing.cpp
     system/test_scheduler.cpp
     timers/test_timers.cpp
+    video/test_bmp.cpp
     video/test_framebuffer.cpp)
 target_include_directories(rpcs1_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(rpcs1_tests PRIVATE rpcs1_core rpcs1_hw rpcs1_video)
@@ -95,6 +97,15 @@ add_test(NAME smoke.bios_load
         -DWORK_DIR=${RPCS1_SMOKE_DIR}/bios_load
         -P "${CMAKE_CURRENT_SOURCE_DIR}/smoke/bios_load.cmake")
 set_tests_properties(smoke.bios_load PROPERTIES LABELS "smoke")
+
+# GPU (Fase 7): o programa de teste escreve na VRAM e a imagem gerada é conferida em BMP.
+add_test(NAME smoke.gpu_frame
+    COMMAND ${CMAKE_COMMAND}
+        -DRPCS1_EXE=$<TARGET_FILE:rpcs1>
+        -DMAKE_BIOS=$<TARGET_FILE:rpcs1_make_test_bios>
+        -DWORK_DIR=${RPCS1_SMOKE_DIR}/gpu_frame
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/smoke/gpu_frame.cmake")
+set_tests_properties(smoke.gpu_frame PROPERTIES LABELS "smoke")
 
 # Abre a janela Win32 de verdade e a fecha após 500 ms (requer área de trabalho interativa).
 if(WIN32)

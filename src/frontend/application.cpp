@@ -9,6 +9,7 @@
 #include "core/unicode.hpp"
 #include "core/platform.hpp"
 #include "core/version.hpp"
+#include "video/bmp.hpp"
 #include "video/framebuffer.hpp"
 #include "video/window.hpp"
 
@@ -18,7 +19,7 @@ namespace {
 
 using log::Category;
 
-// Resolução de saída nominal usada para dimensionar a janela até a GPU existir.
+// Resolução nominal usada para dimensionar a janela (a imagem é escalada para 4:3).
 constexpr u32 nominal_width = 320;
 constexpr u32 nominal_height = 240;
 
@@ -79,6 +80,12 @@ ExitCode Application::run(std::span<const std::string> args) {
               settings_.bios_path.empty() ? std::string("(não configurada)")
                                           : unicode::path_to_utf8(settings_.bios_path));
     initialize_hardware(cl);
+    if (cl.dump_frame) {
+        if (auto saved = dump_frame(*cl.dump_frame); !saved) {
+            log::error(Category::Video, "Falha ao gravar o quadro: {}", saved.error().describe());
+            return ExitCode::RuntimeError;
+        }
+    }
 
     if (cl.headless) {
         log::info(Category::Frontend, "Modo headless: inicialização concluída, encerrando.");
@@ -152,13 +159,16 @@ void Application::initialize_hardware(const CommandLine& cl) {
     console_ = std::make_unique<system::Console>(model_info(settings_.model).region);
     log::info(Category::Bus,
               "Console pronto: RAM 2 MiB, scratchpad 1 KiB, BIOS ROM 512 KiB, Memory Control, "
-              "CPU R3000A com COP0 e I-cache, interrupções, timers, temporização de vídeo e DMA ({})",
+              "CPU R3000A com COP0 e I-cache, interrupções, timers, temporização de vídeo, DMA e "
+              "GPU com VRAM de 1 MiB ({})",
               to_string(console_->region()));
 
-    // Honestidade sobre o estado: só a CPU e o núcleo do sistema existem.
+    // Honestidade sobre o estado: o que existe e o que ainda falta.
     log::warn(Category::Core,
-              "Fase 6: CPU, COP0, interrupções, timers, temporização de vídeo e DMA emulados; "
-              "sem GTE (Fase 9). GPU (desenho), SPU, CD-ROM, MDEC e demais periféricos ainda não existem.");
+              "Fase 7: CPU, COP0, interrupções, timers, vídeo, DMA e GPU (registradores, VRAM, "
+              "preenchimento e transferências) emulados. A GPU ainda não desenha polígonos, linhas "
+              "nem retângulos (Fase 8); sem GTE (Fase 9). SPU, CD-ROM, MDEC e demais periféricos "
+              "ainda não existem.");
 
     if (settings_.bios_path.empty()) {
         log::info(Category::Bios, "Nenhuma BIOS configurada ([BIOS] path); a CPU não será executada.");
@@ -205,11 +215,32 @@ void Application::run_bios_until_stop(u64 limit) {
     if (const auto post = console_->bus().post_code()) {
         log::info(Category::Bios, "Último código POST: {:X}h", *post);
     }
+    log_gpu_state();
+}
+
+void Application::log_gpu_state() {
+    const gpu::Gpu& gpu = console_->gpu();
+    const gpu::DisplayInfo d = gpu.display_info();
+    log::info(Category::Gpu,
+              "GPU: exibição {} | {}×{} ({} bits) a partir de VRAM ({}, {}) | GPUSTAT {:08X}h | "
+              "{} comandos de desenho descartados (Fase 8).",
+              d.enabled ? "ligada" : "desligada", d.width, d.height, d.depth24 ? 24 : 15,
+              d.start_x, d.start_y, gpu.gpustat(), gpu.discarded_draw_commands());
+}
+
+Status Application::dump_frame(const std::filesystem::path& path) {
+    video::Framebuffer frame;
+    console_->gpu().render_display(frame);
+    if (auto saved = video::save_bmp(path, frame); !saved) {
+        return saved;
+    }
+    log::info(Category::Video, "Quadro salvo em {} ({}×{}, BMP 24 bits).",
+              unicode::path_to_utf8(path), frame.width(), frame.height());
+    return Status::success();
 }
 ExitCode Application::run_window_loop(const CommandLine& cl) {
     video::WindowConfig config;
-    config.title = std::string(version::product) + " " + version::string +
-                   " — pré-alfa (sem vídeo ainda)";
+    config.title = std::string(version::product) + " " + version::string + " — pré-alfa";
     config.client_width = nominal_width * settings_.window_scale;
     config.client_height = nominal_height * settings_.window_scale;
 
@@ -220,8 +251,11 @@ ExitCode Application::run_window_loop(const CommandLine& cl) {
     }
     std::unique_ptr<video::Window> window = std::move(created).value();
 
-    // Sem GPU emulada não há sinal de vídeo: a saída é preta, como uma TV sem sinal do console.
-    video::Framebuffer framebuffer(nominal_width, nominal_height, 0x000000);
+    // A imagem é a área de exibição da VRAM no estado em que a execução terminou
+    // (preta com a exibição desligada). ⚠️ A emulação não continua com a janela aberta: o
+    // laço em tempo real com frame pacing é a Fase 20.
+    video::Framebuffer framebuffer;
+    console_->gpu().render_display(framebuffer);
 
     using clock = std::chrono::steady_clock;
     const auto start = clock::now();

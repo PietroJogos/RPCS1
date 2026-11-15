@@ -4,10 +4,13 @@ namespace rpcs1::system {
 
 Console::Console(Region region)
     : region_(region), cpu_(bus_), video_(scheduler_, irq_), timers_(scheduler_, irq_, video_),
-      dma_(bus_, scheduler_, irq_) {
+      dma_(bus_, scheduler_, irq_), gpu_(video_, irq_) {
     bus_.attach_device(bus::IoSlot::Interrupts, irq_);
     bus_.attach_device(bus::IoSlot::Timers, timers_);
     bus_.attach_device(bus::IoSlot::Dma, dma_);
+    bus_.attach_device(bus::IoSlot::Gpu, gpu_);
+    dma_.attach_port(dma::Channel::Gpu, gpu_);
+    gpu_.set_dma(&dma_);
     cpu_.set_interrupt_line(&irq_);
     scheduler_.set_time_source(&cpu_.cycle_counter());
     video_.set_listener(&timers_);
@@ -27,6 +30,7 @@ void Console::power_on() {
     irq_.reset();
     cpu_.reset();
     reset_time_domain();
+    gpu_.power_on();
 }
 
 void Console::reset() {
@@ -34,6 +38,8 @@ void Console::reset() {
     irq_.reset();
     cpu_.reset();
     reset_time_domain();
+    // ⚠️ O sinal de reset reinicia a GPU como GP1(00h); a VRAM (DRAM) mantém o conteúdo.
+    gpu_.reset_command();
 }
 
 Status Console::load_bios(const std::filesystem::path& path) {

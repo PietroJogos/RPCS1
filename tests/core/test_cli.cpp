@@ -94,10 +94,23 @@ TEST_CASE("cli/--cpu-steps") {
     CHECK(!parse({}).value().cpu_steps.has_value());
 }
 
+TEST_CASE("cli/--dump-frame") {
+    auto a = parse({"--dump-frame", "quadro.bmp"});
+    REQUIRE(a.ok());
+    REQUIRE(a.value().dump_frame.has_value());
+    CHECK(*a.value().dump_frame == std::filesystem::path("quadro.bmp"));
+    auto b = parse({"--dump-frame=saída.bmp"});
+    REQUIRE(b.ok());
+    CHECK(*b.value().dump_frame == unicode::path_from_utf8("saída.bmp"));
+    CHECK(!parse({"--dump-frame"}).ok());
+    CHECK(!parse({"--dump-frame="}).ok());
+    CHECK(!parse({}).value().dump_frame.has_value());
+}
+
 TEST_CASE("cli/texto de uso menciona as opções") {
     const std::string usage = usage_text();
     for (const char* option : {"--help", "--version", "--config", "--log-level", "--headless",
-                               "--exit-after", "--cpu-steps"}) {
+                               "--exit-after", "--cpu-steps", "--dump-frame"}) {
         CHECK(usage.find(option) != std::string::npos);
     }
 }

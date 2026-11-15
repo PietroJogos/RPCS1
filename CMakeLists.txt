@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(RPCS1
-    VERSION 0.0.6
+    VERSION 0.0.7
     DESCRIPTION "RPCS1 - emulador original de PlayStation 1 (PiStudio BR)"
     LANGUAGES CXX)
 

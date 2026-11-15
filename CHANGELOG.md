@@ -2,6 +2,23 @@
 
 Formato baseado em "Keep a Changelog". Versões seguem SemVer; antes da 0.1.0 todas são pré-lançamentos.
 
+## [0.0.7] — 15/11/2026 — pré-alfa (Fase 7)
+
+### Adicionado
+- GPU: GP0/GPUREAD e GP1/GPUSTAT, VRAM de 1 MiB, preenchimento (02h), cópias VRAM→VRAM (80h),
+  CPU→VRAM (A0h) e VRAM→CPU (C0h) com máscara (E6h), atributos E1h–E6h, IRQ1, todos os comandos
+  GP1 (GPU v2) e GPUSTAT (14802000h após o reset).
+- Canal 2 de DMA ligado à GPU, com o DREQ por GP1(04h) medido no SCPH-5501.
+- GP1(06h/07h/08h) controlam a temporização de vídeo (modo, entrelaçamento, divisor).
+- Imagem da área de exibição (15 e 24 bits) na janela e em BMP com `--dump-frame <arq>`.
+- Programa de teste MIPS próprio (`rpcs1_make_test_bios --gpu`) e teste `smoke.gpu_frame`, que
+  confere a imagem gerada pixel a pixel e por SHA-256; 26 testes unitários novos.
+
+### Limitações
+- Polígonos, linhas e retângulos ainda não são desenhados (Fase 8): são consumidos e descartados
+  com aviso no log. Comandos executam instantaneamente (D-040).
+- A janela mostra o estado final da execução; não há laço em tempo real (Fase 20).
+
 ## [0.0.6] — 15/11/2026 — pré-alfa (Fase 6)
 
 ### Adicionado

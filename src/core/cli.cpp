@@ -91,6 +91,14 @@ Result<CommandLine> parse_command_line(std::span<const std::string> args) {
                                               CommandLine::max_cpu_steps, value.value()));
             }
             cl.cpu_steps = *steps;
+        } else if (arg == "--dump-frame") {
+            auto value = take_value(arg);
+            if (!value) return value.error();
+            if (value.value().empty()) {
+                return make_error(ErrorCode::InvalidArgument,
+                                  "--dump-frame recebeu um caminho vazio");
+            }
+            cl.dump_frame = unicode::path_from_utf8(value.value());
         } else if (strings::starts_with(arg, "-")) {
             return make_error(ErrorCode::InvalidArgument,
                               std::format("opção desconhecida: {}", args[i]));
@@ -117,11 +125,14 @@ std::string usage_text() {
            "      --exit-after <ms>  Encerra automaticamente após <ms> milissegundos.\n"
            "      --cpu-steps <n>    Limite de passos da CPU ao executar a BIOS\n"
            "                         (padrão: 50000000).\n"
+           "      --dump-frame <arq> Após a execução, grava em <arq> (BMP 24 bits) a\n"
+           "                         imagem da área de exibição da VRAM.\n"
            "\n"
-           "Estado atual: Fase 6 (CPU, COP0, timers, vídeo e DMA). A BIOS\n"
-           "configurada é executada até a primeira instrução que dependa de um\n"
-           "componente inexistente (GTE) ou até o limite de passos. Não há vídeo nem\n"
-           "áudio: a janela exibe somente uma tela preta sem sinal.\n";
+           "Estado atual: Fase 7 (CPU, COP0, timers, DMA e GPU: registradores e\n"
+           "VRAM). A BIOS configurada é executada até a primeira instrução que dependa\n"
+           "de um componente inexistente (GTE) ou até o limite de passos. A janela mostra\n"
+           "a área de exibição da VRAM; polígonos, linhas e retângulos ainda não são\n"
+           "desenhados (Fase 8). Não há áudio.\n";
 }
 
 } // namespace rpcs1

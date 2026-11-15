@@ -605,7 +605,7 @@ Comandos de ambiente:
 | 06h | Faixa horizontal de exibição (em ciclos do clock de vídeo) |
 | 07h | Faixa vertical de exibição (em linhas) |
 | 08h | Modo de exibição (resolução, NTSC/PAL, 24 bits, entrelaçamento) |
-| 09h | Tamanho de VRAM (GPU v2) |
+| 09h | Endereços Y 512–1023 / VRAM de 2 MiB (GPU v2; não alterado por GP1(00h)) |
 | 10h–1Fh | Leitura de registradores internos via GPUREAD (janela de textura, área e offset de desenho; versão na v2) |
 
 ### 10.5 Atributos de renderização
@@ -656,6 +656,23 @@ campos de 262/263 linhas (NTSC) e 312/313 (modo PAL). Após GP1(00h): X = 200h..
 
 Altura: 240 ou 480 (480 apenas com entrelaçamento) em NTSC; a faixa vertical de GP1(07h)
 centraliza em 88h (NTSC, ±120 linhas) ou A3h (PAL, ±144 linhas).
+
+### 10.7 Regras implementadas e verificadas na Fase 7
+
+- **Tamanho dos comandos GP0:** polígono = 1 + n·(1 + textura) + (n − 1)·gouraud (n = 3 ou 4);
+  linha = 3 (plana) ou 4 (gouraud); polilinha termina na primeira palavra de vértice com
+  `(w AND F000F000h) = 50005000h`, só a partir do 3º vértice; retângulo = 2 + textura + (tamanho
+  variável ? 1 : 0); 80h = 4; A0h e C0h = 3 (+ dados); demais = 1.
+- **02h:** X AND 3F0h, Y AND 1FFh, largura `((L AND 3FFh) + 0Fh) AND NOT 0Fh` (3F1h–3FFh → 400h;
+  400h → 0), altura AND 1FFh; cor 24 → 15 bits pelos 5 bits altos; ignora máscara, área e offset.
+- **80h/A0h/C0h:** X AND 3FFh, Y AND 1FFh; tamanho `((v − 1) AND máscara) + 1` (0 = 1024 × 512);
+  halfword baixo primeiro; E6h: não grava sobre bit 15 (bit 1) e grava com bit 15 (bit 0).
+- **GPUSTAT** após GP1(00h) = 14802000h. Bit 25 (DREQ) por GP1(04h): 0 → 0, 1 → 1 (FIFO não
+  cheio), 2 → bit 28, 3 → bit 27 (medido, "gpustat-dma-bits"). Bit 19 = 1 só com bit 22 = 1.
+- **Divisor do dotclock** por GP1(08h): bit 6 → 7; senão bits 0–1 → 10, 8, 5, 4. Largura exibida
+  = `(((X2 − X1) / divisor) + 2) AND NOT 3`.
+- **Exibição de 24 bits:** cada pixel usa 3 bytes consecutivos da linha (R, G, B), a partir de X × 2.
+- Escolhas não documentadas: `docs/DECISIONS.md`, D-040 a D-043.
 
 ---
 
@@ -1146,8 +1163,12 @@ Requisitos para considerar o recurso implementado:
 | 37 | SH em registradores do DMA: "só os próprios bytes" (medido) × "escrita de 32 bits" (psx-spx) | 6 ⚠️ adotado: medido |
 | 38 | Bits 0–5 do DICR (IRQ por bloco/nó?), bit 29 do CHCR, 1F8010F8h, modo 3 reservado | 6 ⚠️ |
 | 39 | Fim de lista com outros endereços de bit 23 ligado; cabeçalho enviado ou não ao dispositivo | 6, 7 ⚠️ |
+| 40 | Tempo de execução dos comandos da GPU e ocupação real do FIFO (bits 25/26/28) | 8, 20 ⚠️ adotado: instantâneo |
+| 41 | Cópia 80h com origem e destino sobrepostos (cópia em blocos) | 8 ⚠️ adotado: pixel a pixel |
+| 42 | Metade alta da última palavra de C0h com total ímpar; GPUREAD com LB/LH | 7 ⚠️ adotado: 0 / avança |
+| 43 | E1h bit 11 armazenado com GP1(09h) = 0? GP1(00h)/GP1(01h) durante C0h | 7 ⚠️ |
 
-As escolhas marcadas como "adotado" estão justificadas em `docs/DECISIONS.md` (D-012 a D-039)
+As escolhas marcadas como "adotado" estão justificadas em `docs/DECISIONS.md` (D-012 a D-043)
 e cobertas por testes, para que qualquer correção futura fique visível como mudança de teste.
 
 Itens de 1 a 9 serão resolvidos com programas de teste próprios e/ou suítes de teste públicas

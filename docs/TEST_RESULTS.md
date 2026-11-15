@@ -3,6 +3,48 @@
 Registro dos testes **realmente executados**. Cada entrada indica ambiente, comando e resultado.
 A entrada mais recente fica no topo.
 
+## 15/11/2026 — Fase 7 (versão 0.0.7)
+
+**Ambiente:** o mesmo das fases anteriores (Windows 11 x64, MSVC 19.44, CMake 4.x), com pouca memória
+livre. Build limpo a partir de pasta vazia (`build/msvc` apagada), `RPCS1_MSVC_MP_JOBS=1` e `/m:1`.
+
+### Compilação: Debug e Release sem avisos (`/W4 /WX`). CTest: 9/9 em Debug e 9/9 em Release.
+
+### Testes unitários: 267/267 (241 anteriores + 26 novos), em Debug e Release
+| Grupo | Casos | O que verifica |
+|---|---|---|
+| `gpu/` | 23 | GPUSTAT = 14802000h após ligar e após GP1(00h); tamanho de todos os comandos GP0; 02h (cor, X em passos de 16, largura arredondada, 3F1h → 400h, 400h → 0, altura 0, ignora máscara, volta nas bordas); A0h (ordem dos halfwords, sobra ímpar, tamanho 0 = 1024); C0h (GPUREAD, bit 27, total ímpar); máscara E6h em A0h e 80h; 80h com volta nas bordas; E1h–E6h, GP1(09h), GP1(10h) v2 e espelhos; GP1(03h/04h/08h) no GPUSTAT; DREQ por direção; IRQ1 por 1Fh/GP1(02h); comandos de desenho consumidos sem dessincronizar; polilinhas plana e gouraud; GP1(01h) e GP1(00h); GP1(06h–08h) na temporização de vídeo; largura/altura exibidas (256, 320, 364, 640×480, limites); imagem de 15 e de 24 bits; exibição desligada; acesso pelo barramento e reset do Console; DMA canal 2 (lista, blocos para a VRAM, leitura GPUREAD → RAM iniciada pelo DREQ do C0h) |
+| `bmp/` | 2 | Cabeçalho, linhas de baixo para cima, ordem B-G-R, alinhamento de 4 bytes; gravação, imagem vazia e destino inválido |
+| `cli/` | 1 | `--dump-frame` (valor separado, `=`, ausente, vazio) |
+
+### Teste de fumaça `smoke.gpu_frame` (novo)
+- BIOS **sintética** gerada por `rpcs1_make_test_bios --gpu` (programa MIPS próprio): GP1 configura
+  320×240 NTSC 15 bits; 4 preenchimentos; 1 preenchimento por DMA (lista encadeada); 1 triângulo
+  (descartado); 1 preenchimento depois dele; A0h de 4×2 pixels; 80h copiando-os; exibição ligada.
+- Confere no log POST 1 e 2, o aviso do GP0(20h), o resumo da GPU e o quadro salvo; no BMP:
+  tamanho, cabeçalho, **31 pixels** com as cores esperadas e o **SHA-256**
+  `79C2774E…9F07CD` (igual em Debug e Release). Sem BIOS: imagem preta 256×240. Caminho de saída
+  inválido: código 1.
+- Imagem conferida visualmente no BMP e na janela Win32 real (captura de tela da janela aberta com
+  o mesmo programa): os retângulos, a faixa do DMA e os blocos de 4×2 aparecem; o triângulo não.
+
+### Teste de mutação
+- 5 defeitos introduzidos de uma vez em `gpu.cpp` (halfword alto primeiro no A0h, largura do 02h sem
+  arredondar, marcador de polilinha aceito no 2º vértice, GPUSTAT bit 13 = 0, máscara E6h bit 1
+  ignorada sem o bit 0). O build mutante **compilou** (exit 0) e **8 testes unitários e o
+  `smoke.gpu_frame` falharam**; cada defeito foi detectado por pelo menos um teste. Código restaurado.
+
+### Problemas encontrados e corrigidos
+- GP1(09h) e o bit 11 de E1h tinham sido escritos como "permitir desabilitar textura"; a pesquisa da
+  fase (psx-spx/psx.wiki) diz "base Y 2 da textura" (GPUSTAT 15) e "VRAM de 2 MiB" (GP1(09h)).
+  Corrigido antes do build final (D-041).
+- Nenhum teste falhou no build final.
+
+### Não testado
+- Comparação com um console real: não há medições publicadas da imagem gerada por estes comandos;
+  os valores vêm do psx-spx e do psx.wiki (bits de DMA do GPUSTAT medidos em SCPH-5501).
+- BIOS real do usuário: não executada nesta sessão (nenhuma BIOS é distribuída ou usada nos testes).
+
 ## 15/11/2026 — Fase 6 (versão 0.0.6)
 
 **Ambiente:** o mesmo das fases anteriores, com **pouca memória livre na máquina** (≈0,9–1,2 GB de

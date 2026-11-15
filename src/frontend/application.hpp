@@ -36,6 +36,8 @@ private:
     void configure_logging(const CommandLine& cl);
     void initialize_hardware(const CommandLine& cl);
     void run_bios_until_stop(u64 limit);
+    void log_gpu_state();
+    [[nodiscard]] Status dump_frame(const std::filesystem::path& path);
 
     static constexpr u64 default_cpu_steps = 50'000'000;
     [[nodiscard]] ExitCode run_window_loop(const CommandLine& cl);

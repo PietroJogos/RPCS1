@@ -2,12 +2,13 @@
 
 **Emulador original de PlayStation 1 para Windows 10 e 11 — desenvolvido pelo PiStudio BR.**
 
-> ⚠️ **Estado atual: pré-alfa (Fase 6 — DMA).** Memória, barramento, CPU, COP0, interrupções,
-> I-cache, timers, temporização de vídeo (VBLANK/IRQ0) e DMA estão emulados e testados, com timers,
-> vídeo e DMA conferidos contra medições de um SCPH-5501. A BIOS configurada é executada até a
-> primeira instrução da GTE ou até o limite de passos — sem GPU, CD-ROM, SPU e demais periféricos
-> ela não chega ao fim da inicialização. Não há imagem nem som: a janela exibe tela preta.
-> **Nenhum jogo, BIOS ou programa de PS1 roda por completo.**
+> ⚠️ **Estado atual: pré-alfa (Fase 7 — GPU: registradores e VRAM).** Memória, barramento, CPU,
+> COP0, interrupções, I-cache, timers, temporização de vídeo, DMA e a parte de registradores e VRAM
+> da GPU estão emulados e testados. Programas podem preencher, copiar e transferir pixels na VRAM e
+> a área de exibição aparece na janela — mas **polígonos, linhas e retângulos ainda não são
+> desenhados** (Fase 8). A BIOS configurada é executada até a primeira instrução da GTE ou até o
+> limite de passos; sem GTE, CD-ROM, SPU e demais periféricos ela não chega ao fim da
+> inicialização. Não há som. **Nenhum jogo, BIOS ou programa de PS1 roda por completo.**
 
 ## Objetivo
 
@@ -18,6 +19,8 @@ emuladores. Veja o [roadmap das 26 fases](docs/ROADMAP.md) e o [progresso](docs/
 
 ## O que existe hoje
 
+- **Fase 7:** GPU — GP0/GP1, GPUSTAT, VRAM de 1 MiB, preenchimento, cópias e transferências
+  (CPU e DMA), modos de exibição de 15/24 bits e imagem na janela ou em BMP (`--dump-frame`).
 - **Fase 6:** DMA com os 7 canais (burst, slice, lista encadeada, OTC), DPCR, DICR e IRQ3.
 - **Fase 5:** scheduler de eventos, timers 0–2, temporização de vídeo com HBLANK/VBLANK e IRQ0.
 - **Fase 4:** COP0 (SR, CAUSE, EPC...), despacho de exceções, interrupções de hardware e
@@ -31,8 +34,8 @@ emuladores. Veja o [roadmap das 26 fases](docs/ROADMAP.md) e o [progresso](docs/
 - Sistema de logging com níveis e categorias por componente, em console e arquivo.
 - Tratamento de erros por valor, asserções e registro de falhas fatais.
 - Configuração `rpcs1.ini` validada e comentada, criada na primeira execução.
-- Janela Win32 DPI-aware com apresentação de framebuffer em proporção 4:3.
-- 241 testes unitários e 7 testes de fumaça do executável.
+- Janela Win32 DPI-aware que apresenta a área de exibição da VRAM em proporção 4:3.
+- 267 testes unitários e 8 testes de fumaça do executável.
 - Documentação técnica do hardware: [docs/HARDWARE_ARCHITECTURE.md](docs/HARDWARE_ARCHITECTURE.md).
 
 ## Compilar
@@ -77,6 +80,8 @@ RPCS1.exe --help
 | `--log-level <nível>` | `trace`, `debug`, `info`, `warn`, `error`, `fatal` ou `off` |
 | `--headless` | Inicializa sem abrir janela (testes) |
 | `--exit-after <ms>` | Fecha sozinho após o tempo indicado (testes) |
+| `--cpu-steps <n>` | Limite de passos da CPU ao executar a BIOS (padrão: 50 000 000) |
+| `--dump-frame <arq>` | Ao final, grava a imagem da área de exibição em BMP de 24 bits |
 | `--version` | Mostra a versão |
 
 Códigos de saída: `0` sucesso, `1` erro em tempo de execução, `2` uso incorreto, `3` configuração inválida.
