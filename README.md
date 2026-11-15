@@ -2,10 +2,10 @@
 
 **Emulador original de PlayStation 1 para Windows 10 e 11 — desenvolvido pelo PiStudio BR.**
 
-> ⚠️ **Estado atual: pré-alfa (Fase 5 — base de tempo).** Memória, barramento, CPU, COP0,
-> interrupções, I-cache, timers e a temporização de vídeo (VBLANK/IRQ0) estão emulados e testados,
-> com timers e vídeo conferidos contra medições de um SCPH-5501. A BIOS configurada é executada até a
-> primeira instrução da GTE ou até o limite de passos — sem GPU, DMA, CD-ROM e demais periféricos
+> ⚠️ **Estado atual: pré-alfa (Fase 6 — DMA).** Memória, barramento, CPU, COP0, interrupções,
+> I-cache, timers, temporização de vídeo (VBLANK/IRQ0) e DMA estão emulados e testados, com timers,
+> vídeo e DMA conferidos contra medições de um SCPH-5501. A BIOS configurada é executada até a
+> primeira instrução da GTE ou até o limite de passos — sem GPU, CD-ROM, SPU e demais periféricos
 > ela não chega ao fim da inicialização. Não há imagem nem som: a janela exibe tela preta.
 > **Nenhum jogo, BIOS ou programa de PS1 roda por completo.**
 
@@ -18,6 +18,7 @@ emuladores. Veja o [roadmap das 26 fases](docs/ROADMAP.md) e o [progresso](docs/
 
 ## O que existe hoje
 
+- **Fase 6:** DMA com os 7 canais (burst, slice, lista encadeada, OTC), DPCR, DICR e IRQ3.
 - **Fase 5:** scheduler de eventos, timers 0–2, temporização de vídeo com HBLANK/VBLANK e IRQ0.
 - **Fase 4:** COP0 (SR, CAUSE, EPC...), despacho de exceções, interrupções de hardware e
   software, modo usuário, I-cache, isolamento de cache e controlador de interrupções.
@@ -31,7 +32,7 @@ emuladores. Veja o [roadmap das 26 fases](docs/ROADMAP.md) e o [progresso](docs/
 - Tratamento de erros por valor, asserções e registro de falhas fatais.
 - Configuração `rpcs1.ini` validada e comentada, criada na primeira execução.
 - Janela Win32 DPI-aware com apresentação de framebuffer em proporção 4:3.
-- 222 testes unitários e 7 testes de fumaça do executável.
+- 241 testes unitários e 7 testes de fumaça do executável.
 - Documentação técnica do hardware: [docs/HARDWARE_ARCHITECTURE.md](docs/HARDWARE_ARCHITECTURE.md).
 
 ## Compilar
@@ -52,6 +53,17 @@ ctest --preset release
 ```
 
 O executável fica em `build/msvc/bin/Release/RPCS1.exe`.
+
+Se a compilação falhar com o erro C1060 ("espaço de heap do compilador insuficiente"), há pouca
+memória livre: limite a compilação paralela e use um processo do MSBuild.
+
+```bash
+cmake --preset windows-msvc -DRPCS1_MSVC_MP_JOBS=1
+```
+
+```bash
+cmake --build --preset release -- /m:1
+```
 
 ## Usar
 

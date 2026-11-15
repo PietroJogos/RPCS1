@@ -13,7 +13,7 @@
 
 namespace rpcs1::system {
 
-enum class EventId : u8 { Video = 0, Timer0, Timer1, Timer2, Count };
+enum class EventId : u8 { Video = 0, Timer0, Timer1, Timer2, Dma, Count };
 
 [[nodiscard]] std::string_view to_string(EventId id) noexcept;
 

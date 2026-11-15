@@ -438,6 +438,30 @@ Modos de sincronização: **0 = burst** (tudo de uma vez; OTC e CD-ROM), **1 = s
   (escrever 1 limpa); bit 31 flag mestre (somente leitura) = bit15 OR (bit23 AND algum bit 24–30).
   A transição 0→1 do bit 31 dispara IRQ3.
 
+### 8.1 Comportamento medido (SCPH-5501, psx.wiki — "dma2", "dma-otc", "dmatime")
+
+- **Início:** CHCR bit 24 + habilitação no DPCR + (DREQ do dispositivo ou bit 28). O bit 28 é limpo
+  ao começar. O OTC só começa com o bit 28 (valor usual 11000002h). Habilitar no DPCR um canal já
+  armado o inicia. Zerar o bit 24 durante a transferência a interrompe.
+- **Fim:** bit 24 limpo. Burst sem chopping: MADR e BCR inalterados; com chopping, MADR avança e
+  BCR zera. Slice: MADR = início + BS × BA × 4, BA = 0, BS mantido. Lista: MADR termina no marcador
+  00FFFFFFh, BCR ignorado; fim em FFFFFEh ou 800000h liga o bit 15 (erro); lista que aponta para si
+  mesma nunca termina; nós vazios são permitidos (~10 ciclos por nó, ~1 por palavra).
+- **OTC:** ignora direção, passo e modo; cada entrada contém o endereço da anterior, a última
+  00FFFFFFh; BCR 0 = 65 536 entradas; passar de 000000h não grava fora da RAM.
+- **CHCR:** bits graváveis 71770703h (canais 0–5) e 51000002h no canal 6 (bit 1 sempre 1); espelho em +Ch.
+  SB/SH em BCR e CHCR alteram só os próprios bytes.
+- **DICR:** bits 0–5 R/W (bit 6 lê 0); 15 R/W; 16–23 R/W; 24–30 escrever 1 limpa; 31 somente leitura.
+  ⚠️ **Diverge do psx-spx:** o flag do canal liga ao fim com a habilitação do canal (bit 16+n),
+  **mesmo sem o bit 23**; só o bit 31/IRQ3 exige o bit 23. Ligar o bit 23 com um flag pendente dispara
+  o IRQ3; um segundo flag com o bit 31 já ligado não gera nova borda.
+- **DPCR:** reset 07654321h; empate de prioridade favorece o canal de número maior; os bits 28–30
+  (prioridade da CPU) não tiveram efeito mensurável.
+- **1F8010FCh** lê 00FFFFFFh (o psx-spx diz 00FFFFF7h); **1F8010F8h** varia entre execuções.
+- **Duração:** OTC ≈1 ciclo/palavra; GPU slice 16×16 ≈ 511 ciclos; SPU burst ≈ 8 ciclos/palavra
+  (a tabela do psx-spx diz 4). Durante o DMA a CPU continua rodando código em cache, mas acessos à
+  RAM esperam o fim da transferência.
+
 ---
 
 ## 9. Timers
@@ -1118,8 +1142,12 @@ Requisitos para considerar o recurso implementado:
 | 33 | Timer 1 em HBLANK pausado no VBLANK: medido 239/quadro, modelo 240; sysclock reset no VBLANK lido no IRQ0: medido 55 425–57 886, modelo 57 937 | 5 ⚠️ calibração pendente |
 | 34 | Tempos de acesso à memória, I-cache e fila de escrita (fórmulas incompletas no psx-spx) | 20 |
 | 35 | Taxa PAL citada pelo psx-spx (49,761 Hz) × 49,747 Hz calculados com os mesmos valores | 5 ⚠️ |
+| 36 | Paralisação da CPU durante o DMA, chopping e tempo exato por dispositivo | 20 |
+| 37 | SH em registradores do DMA: "só os próprios bytes" (medido) × "escrita de 32 bits" (psx-spx) | 6 ⚠️ adotado: medido |
+| 38 | Bits 0–5 do DICR (IRQ por bloco/nó?), bit 29 do CHCR, 1F8010F8h, modo 3 reservado | 6 ⚠️ |
+| 39 | Fim de lista com outros endereços de bit 23 ligado; cabeçalho enviado ou não ao dispositivo | 6, 7 ⚠️ |
 
-As escolhas marcadas como "adotado" estão justificadas em `docs/DECISIONS.md` (D-012 a D-035)
+As escolhas marcadas como "adotado" estão justificadas em `docs/DECISIONS.md` (D-012 a D-039)
 e cobertas por testes, para que qualquer correção futura fique visível como mudança de teste.
 
 Itens de 1 a 9 serão resolvidos com programas de teste próprios e/ou suítes de teste públicas
@@ -1161,5 +1189,8 @@ psx.wiki (<https://psx.wiki/>), consultado na Fase 5: páginas de hardware
 (<https://psx.wiki/hardware/timers/>, <https://psx.wiki/hardware/gpu/gpustat/>,
 <https://psx.wiki/hardware/gpu/video-timing/>) e resultados de testes executados em um SCPH-5501
 (<https://psx.wiki/tests/display-timing/>, <https://psx.wiki/tests/timers2/>,
-<https://psx.wiki/tests/timers3/>, <https://psx.wiki/tests/timers-ps1-tests/>). Só os números
-medidos e as descrições de comportamento foram usados; nenhum código de teste foi copiado.
+<https://psx.wiki/tests/timers3/>, <https://psx.wiki/tests/timers-ps1-tests/>). Fase 6:
+<https://psx.wiki/hardware/dma/>, <https://psx.wiki/tests/dma2/>, <https://psx.wiki/tests/dma-otc/>,
+<https://psx.wiki/tests/dmatime/>, <https://psx.wiki/tests/dma-chain-looping/>,
+<https://psx.wiki/tests/dma-chopping/>. Só os números medidos e as descrições de comportamento foram
+usados; nenhum código de teste foi copiado.

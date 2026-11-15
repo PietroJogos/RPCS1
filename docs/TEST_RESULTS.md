@@ -3,6 +3,47 @@
 Registro dos testes **realmente executados**. Cada entrada indica ambiente, comando e resultado.
 A entrada mais recente fica no topo.
 
+## 15/11/2026 — Fase 6 (versão 0.0.6)
+
+**Ambiente:** o mesmo das fases anteriores, com **pouca memória livre na máquina** (≈0,9–1,2 GB de
+32 GB). Build limpo a partir de pasta vazia: Debug com `RPCS1_MSVC_MP_JOBS=2`, Release com
+`RPCS1_MSVC_MP_JOBS=1`, ambos com `/m:1`.
+
+### Compilação: Debug e Release sem avisos. CTest: 8/8 em Debug e 8/8 em Release.
+
+### Testes unitários: 241/241 (222 anteriores + 19 novos)
+| Grupo | Casos | O que verifica |
+|---|---|---|
+| `dma/` | 18 | Reset; máscaras de MADR/CHCR e espelho; SB/SH por bytes; DICR (bits graváveis, bit 15, bit 31); OTC (tabela, bit 28, DPCR, BCR 0, passagem por 0); flag sem bit 23 (3 casos medidos); borda do IRQ3; burst nos dois sentidos, passo −4, chopping; espera de DREQ; slice com pausa; lista com nós vazios e duração; fim com erro; lista em laço; prioridade; aviso de canal sem dispositivo |
+| `console/` | 1 | Programa da CPU configura o OTC, espera o bit 24, recebe IRQ3 e lê a tabela |
+
+### Comparação com medições em SCPH-5501 (psx.wiki)
+| Grandeza | Medido | RPCS1 |
+|---|---|---|
+| Máscara do CHCR (0–5 / 6) | 71770703h / 51000002h | idem ✅ |
+| DICR após OTC: só habilitação / + bit 23 / só bit 23 | 40400000h / C0C00000h+IRQ3 / 00800000h | idem ✅ |
+| Escrever 8000h / 80000000h no DICR | 80008000h + IRQ3 / 0 | idem ✅ |
+| OTC a partir de 4 com 3 entradas | [4]=0, [0]=00FFFFFCh, 1FFFFCh intacto | idem ✅ |
+| Slice 16×16: MADR, BCR finais | início + 400h, 00000010h | regra idêntica ✅ |
+| Lista: MADR final / BCR | 00FFFFFFh / inalterado | idem ✅ |
+| Lista em laço | ocupada para sempre, sem IRQ | idem ✅ |
+| Prioridade: dados que ficam na RAM | do canal de menor prioridade | idem ✅ |
+| Duração do OTC de 65 536 entradas | 69 586 (com custo de leitura) | 65 536 ⚠️ sem sobrecarga |
+
+### Teste de mutação
+Exigir o bit 23 para ligar o flag (a regra do psx-spx) e tirar o marcador de fim do OTC:
+**7 testes falharam** como esperado; código restaurado e 241/241 novamente.
+
+### Problemas encontrados e corrigidos
+1. **Compilação sem memória (C1060)** na máquina de desenvolvimento: criada a opção
+   `RPCS1_MSVC_MP_JOBS` e o build passou a usar menos processos paralelos.
+2. **Objeto antigo após o build interrompido:** a primeira execução mostrou 789 VBLANKs em vez de 3 e
+   uma violação de acesso em testes que usam o `Console`. Causa: `test_timers.obj` de antes da mudança
+   do tamanho do `Console` (o build tinha falhado por falta de memória). Um build limpo resolveu; o
+   código estava correto. Por isso os resultados acima vêm de builds a partir de pasta vazia.
+3. Revisão antes da compilação: escrita estreita no DICR podia limpar flags de bytes não escritos;
+   corrigido antes de qualquer teste.
+
 ## 15/11/2026 — Fase 5 (versão 0.0.5)
 
 **Ambiente:** o mesmo das fases anteriores; build limpo a partir de pasta vazia, Debug e Release.

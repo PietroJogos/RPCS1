@@ -26,6 +26,7 @@ add_executable(rpcs1_tests
     memory/test_bios_rom.cpp
     memory/test_memory_block.cpp
     memory/test_memory_control.cpp
+    dma/test_dma.cpp
     gpu/test_video_timing.cpp
     system/test_scheduler.cpp
     timers/test_timers.cpp

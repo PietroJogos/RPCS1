@@ -118,7 +118,7 @@ std::string usage_text() {
            "      --cpu-steps <n>    Limite de passos da CPU ao executar a BIOS\n"
            "                         (padrão: 50000000).\n"
            "\n"
-           "Estado atual: Fase 5 (CPU, COP0, timers e temporização de vídeo). A BIOS\n"
+           "Estado atual: Fase 6 (CPU, COP0, timers, vídeo e DMA). A BIOS\n"
            "configurada é executada até a primeira instrução que dependa de um\n"
            "componente inexistente (GTE) ou até o limite de passos. Não há vídeo nem\n"
            "áudio: a janela exibe somente uma tela preta sem sinal.\n";

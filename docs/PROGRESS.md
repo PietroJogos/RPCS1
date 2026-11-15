@@ -13,8 +13,8 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
 | 3 | CPU R3000A | **concluída** | Interpretador sem coprocessadores; 56 testes novos; exceções detectadas (despacho na Fase 4) |
 | 4 | COP0, exceções, cache | **concluída** | COP0, despacho de exceções, interrupções, I-cache, isolamento e controlador I_STAT/I_MASK; 36 testes novos |
 | 5 | Scheduler e timers | **concluída** | Scheduler, temporização de vídeo (IRQ0) e timers validados contra medições do SCPH-5501; 31 testes novos; 2 divergências de 1 linha registradas (D-033); tempos de memória movidos para a Fase 20 |
-| 6 | DMA | não iniciada | Próxima fase |
-| 7 | GPU: registradores e VRAM | não iniciada | |
+| 6 | DMA | **concluída** | 7 canais, burst/slice/lista/OTC, DPCR/DICR/IRQ3 validados contra medições do SCPH-5501; 19 testes novos; CPU não paralisada durante o DMA (D-036) |
+| 7 | GPU: registradores e VRAM | não iniciada | Próxima fase |
 | 8 | GPU: renderização | não iniciada | |
 | 9 | GTE | não iniciada | |
 | 10 | MDEC | não iniciada | |
@@ -127,15 +127,32 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
 - **Frontend:** a BIOS roda pelo `Console::run` (eventos de vídeo e timers); o log informa tempo
   emulado, quadros e VBLANKs.
 
+## Fase 6 — o que foi realmente implementado
+
+- **Controlador de DMA** (`src/dma`): 7 canais com MADR/BCR/CHCR (espelho em +Ch), DPCR e DICR,
+  máscaras de bits e escritas estreitas como medidas no SCPH-5501.
+- **Modos:** burst (com e sem chopping), slice (um bloco por DREQ, pausa e retomada), lista
+  encadeada (nós vazios, fim em FFFFFFh, erro em endereços de bit 23, lista em laço que nunca termina)
+  e OTC (tabela de ordenação para baixo, 65 536 entradas com BCR 0).
+- **Início e prioridade:** bit 24 + DPCR + (DREQ ou bit 28); habilitar no DPCR inicia canais armados
+  em ordem de prioridade (empate → canal maior).
+- **DICR/IRQ3:** flag com a habilitação do canal (medido, independe do bit 23), bit 31 recalculado,
+  IRQ3 na borda; bit 15 em erro de barramento.
+- **Interface `DmaPort`** para os dispositivos, com marcadores explícitos para GPU, MDEC, CD-ROM,
+  SPU e porta de expansão.
+- **Build:** opção `RPCS1_MSVC_MP_JOBS` para compilar com pouca memória livre.
+
 ## Recursos ausentes (conscientemente)
 
-- GTE (COP2); GPU (comandos, VRAM, GPUSTAT), SPU, CD-ROM, DMA, SIO, controles, Memory Cards.
-- Tempos de acesso à memória, I-cache e fila de escrita (movidos para a Fase 20, D-034).
+- GTE (COP2); GPU (comandos, VRAM, GPUSTAT), SPU, CD-ROM, MDEC, SIO, controles, Memory Cards —
+  seus canais de DMA já existem, mas os dispositivos ainda são marcadores.
+- Paralisação da CPU durante o DMA, efeito do chopping no tempo e ritmo real de cada dispositivo
+  (D-036); tempos de acesso à memória (Fase 20).
 - Calibração fina de 1 linha nos timers sincronizados ao VBLANK (D-033).
 - Disparo de breakpoints de hardware (Fase 23); modos LOCK/INV do BCC.
 
 ## Próxima dependência técnica
 
-**Fase 6 — DMA:** os 7 canais (burst, slice, linked list), DPCR/DICR e IRQ3. É o caminho pelo
-qual a BIOS e os jogos alimentam GPU, CD-ROM, SPU e MDEC, e já pode ser testado com o barramento,
-o scheduler e o controlador de interrupções existentes.
+**Fase 7 — GPU: registradores e VRAM:** GP0/GP1, FIFO, VRAM de 1 MiB, GPUSTAT, cópias CPU↔VRAM
+(inclusive pelo canal 2 de DMA, que já existe) e saída da área de exibição para a janela. É o primeiro
+passo para que a BIOS produza imagem.

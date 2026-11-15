@@ -39,6 +39,7 @@ add_library(rpcs1_hw STATIC
     cpu/cpu.cpp
     cpu/disassembler.cpp
     cpu/icache.cpp
+    dma/dma_controller.cpp
     gpu/video_timing.cpp
     interrupts/interrupt_controller.cpp
     memory/bios_rom.cpp

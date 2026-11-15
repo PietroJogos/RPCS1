@@ -199,6 +199,36 @@ acrescentadas no fim; decisões revistas são marcadas como substituídas, não 
   alvo = FFFFh gera um único IRQ; bits 16–31 lidos como zero; +Ch de cada timer lido como zero;
   reset no alvo com fontes lentas aplicado no mesmo tick (o hardware reseta 1 ciclo depois).
 
+## D-036 — Modelo de tempo do DMA (Fase 6)
+- **Burst, slice e OTC:** os dados são movidos no instante do início; o canal permanece ocupado
+  (CHCR bit 24) pela duração estimada e o flag/IRQ3 ocorre ao fim, via scheduler.
+- **Lista encadeada:** avança nó a nó no tempo emulado (10 ciclos por nó + 1 por palavra, medido),
+  processada em fatias de até 2048 ciclos por evento; uma lista em laço fica ocupada para sempre
+  sem travar o emulador, e a CPU roda entre as fatias.
+- **Duração por palavra:** tabela do psx-spx (1 para MDEC/GPU/OTC, 24 CD-ROM, 4 SPU, 20 PIO).
+  ⚠️ Medições divergem (SPU ≈8; GPU slice ≈2); o ritmo real virá do DREQ de cada dispositivo
+  quando ele for implementado (Fases 7, 10–12).
+- **CPU não paralisada** durante o DMA e chopping sem efeito no tempo: dependem dos tempos de
+  acesso à memória (Fase 20). Ler o destino antes do fim já mostra os dados novos.
+
+## D-037 — Escritas estreitas nos registradores do DMA
+- Medido no SCPH-5501: SB/SH em BCR e CHCR alteram só os próprios bytes. O psx-spx menciona SH em
+  registradores do DMA tratado como escrita de 32 bits. Adotada a medição, aplicada a todos os
+  registradores do DMA (⚠️ MADR/DPCR/DICR não foram medidos). No DICR, flags de bytes não escritos
+  não são limpos.
+
+## D-038 — Outras escolhas do DMA ⚠️
+- 1F8010F8h lê 0 (varia no hardware); modo de sincronização 3 tratado como burst; fim de lista com
+  qualquer endereço de bit 23 ligado diferente de FFFFFFh = erro de barramento; o cabeçalho da lista
+  não é enviado ao dispositivo; acesso fora da RAM liga o bit 15 do DICR (inclusive o OTC que passa de
+  000000h); bits 0–5 do DICR e o bit 29 do CHCR são armazenados sem efeito.
+- Canais sem dispositivo usam `PlaceholderPort`: DREQ ativo, escritas descartadas, leitura 0 (PIO lê
+  FFFFFFFFh, medido) e aviso único no log citando a fase.
+
+## D-039 — Limite de paralelismo na compilação
+- Em máquinas com pouca memória livre o MSVC falha com C1060. A opção `RPCS1_MSVC_MP_JOBS`
+  (vazio = todos os núcleos, 1 = desliga /MP) permite compilar nesses casos.
+
 ## D-010 — MSVC como compilador de referência
 - **Decisão:** Visual Studio 2022 (MSVC 19.44) é o compilador verificado. O código evita
   extensões específicas, mas nenhum outro compilador foi testado ainda (o MinGW disponível na

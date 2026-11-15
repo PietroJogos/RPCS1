@@ -3,9 +3,11 @@
 namespace rpcs1::system {
 
 Console::Console(Region region)
-    : region_(region), cpu_(bus_), video_(scheduler_, irq_), timers_(scheduler_, irq_, video_) {
+    : region_(region), cpu_(bus_), video_(scheduler_, irq_), timers_(scheduler_, irq_, video_),
+      dma_(bus_, scheduler_, irq_) {
     bus_.attach_device(bus::IoSlot::Interrupts, irq_);
     bus_.attach_device(bus::IoSlot::Timers, timers_);
+    bus_.attach_device(bus::IoSlot::Dma, dma_);
     cpu_.set_interrupt_line(&irq_);
     scheduler_.set_time_source(&cpu_.cycle_counter());
     video_.set_listener(&timers_);
@@ -17,6 +19,7 @@ void Console::reset_time_domain() {
     scheduler_.reset();
     video_.reset(region_, cpu_.cycles());
     timers_.reset(cpu_.cycles());
+    dma_.reset();
 }
 
 void Console::power_on() {
@@ -45,6 +48,7 @@ void Console::dispatch_events() {
         case EventId::Timer0: timers_.on_event(0, event->time); break;
         case EventId::Timer1: timers_.on_event(1, event->time); break;
         case EventId::Timer2: timers_.on_event(2, event->time); break;
+        case EventId::Dma: dma_.on_event(event->time); break;
         case EventId::Count: break;
         }
     }

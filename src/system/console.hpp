@@ -10,6 +10,7 @@
 #include "core/console_model.hpp"
 #include "core/error.hpp"
 #include "cpu/cpu.hpp"
+#include "dma/dma_controller.hpp"
 #include "gpu/video_timing.hpp"
 #include "interrupts/interrupt_controller.hpp"
 #include "system/scheduler.hpp"
@@ -45,6 +46,7 @@ public:
     [[nodiscard]] Scheduler& scheduler() noexcept { return scheduler_; }
     [[nodiscard]] gpu::VideoTiming& video() noexcept { return video_; }
     [[nodiscard]] timers::Timers& timers() noexcept { return timers_; }
+    [[nodiscard]] dma::DmaController& dma() noexcept { return dma_; }
 
 private:
     void reset_time_domain();
@@ -56,6 +58,7 @@ private:
     Scheduler scheduler_;
     gpu::VideoTiming video_;
     timers::Timers timers_;
+    dma::DmaController dma_;
 };
 
 } // namespace rpcs1::system

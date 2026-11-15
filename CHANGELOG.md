@@ -2,6 +2,15 @@
 
 Formato baseado em "Keep a Changelog". Versões seguem SemVer; antes da 0.1.0 todas são pré-lançamentos.
 
+## [0.0.6] — 15/11/2026 — pré-alfa (Fase 6)
+
+### Adicionado
+- Controlador de DMA com os 7 canais: burst, slice, lista encadeada e OTC; DPCR, DICR e IRQ3.
+- Regras medidas em um SCPH-5501: máscaras do CHCR, flag do DICR sem o bit 23, escritas por byte.
+- Interface `DmaPort` para os dispositivos; marcadores para GPU, MDEC, CD-ROM, SPU e expansão.
+- Opção de build `RPCS1_MSVC_MP_JOBS` para máquinas com pouca memória livre.
+- 19 testes novos.
+
 ## [0.0.5] — 15/11/2026 — pré-alfa (Fase 5)
 
 ### Adicionado

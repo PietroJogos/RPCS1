@@ -152,13 +152,13 @@ void Application::initialize_hardware(const CommandLine& cl) {
     console_ = std::make_unique<system::Console>(model_info(settings_.model).region);
     log::info(Category::Bus,
               "Console pronto: RAM 2 MiB, scratchpad 1 KiB, BIOS ROM 512 KiB, Memory Control, "
-              "CPU R3000A com COP0 e I-cache, interrupções, timers e temporização de vídeo ({})",
+              "CPU R3000A com COP0 e I-cache, interrupções, timers, temporização de vídeo e DMA ({})",
               to_string(console_->region()));
 
     // Honestidade sobre o estado: só a CPU e o núcleo do sistema existem.
     log::warn(Category::Core,
-              "Fase 5: CPU, COP0, interrupções, timers e temporização de vídeo (VBLANK) emulados; "
-              "sem GTE (Fase 9). GPU (desenho), SPU, CD-ROM, DMA e demais periféricos ainda não existem.");
+              "Fase 6: CPU, COP0, interrupções, timers, temporização de vídeo e DMA emulados; "
+              "sem GTE (Fase 9). GPU (desenho), SPU, CD-ROM, MDEC e demais periféricos ainda não existem.");
 
     if (settings_.bios_path.empty()) {
         log::info(Category::Bios, "Nenhuma BIOS configurada ([BIOS] path); a CPU não será executada.");

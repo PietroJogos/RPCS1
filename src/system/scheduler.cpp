@@ -8,6 +8,7 @@ std::string_view to_string(EventId id) noexcept {
     case EventId::Timer0: return "timer 0";
     case EventId::Timer1: return "timer 1";
     case EventId::Timer2: return "timer 2";
+    case EventId::Dma: return "DMA";
     case EventId::Count: break;
     }
     return "?";
