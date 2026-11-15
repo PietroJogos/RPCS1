@@ -1,6 +1,46 @@
 # Resultados de testes
 
 Registro dos testes **realmente executados**. Cada entrada indica ambiente, comando e resultado.
+A entrada mais recente fica no topo.
+
+## 15/11/2026 — Fase 2 (versão 0.0.2)
+
+**Ambiente:** o mesmo da Fase 0 (Windows 11 Pro x64, MSVC 19.44.35229, CMake 4.4.4), build
+limpo a partir de pasta vazia, Debug e Release.
+
+### Compilação
+| Configuração | Resultado | Avisos (`/W4 /permissive- /WX`) |
+|---|---|---|
+| Debug | ✅ sucesso | 0 |
+| Release | ✅ sucesso | 0 |
+
+### CTest: 8/8 em Debug e 8/8 em Release
+Novo: `smoke.bios_load` — com uma BIOS **sintética** de 512 KiB (bytes `41h`, não é uma BIOS
+real) o programa registra "BIOS carregada" e "primeira instrução: 41414141h"; com um arquivo de
+3 bytes registra a exigência de 524 288 bytes; com arquivo ausente, "não encontrado". Em todos os
+casos encerra normalmente e informa que nada é executado.
+
+### Testes unitários: 99/99 (61 anteriores + 38 novos)
+| Grupo | Casos | Cobertura |
+|---|---|---|
+| `address/` | 4 | Fronteiras de segmento, tradução física (inclui varredura), regiões com cache, alinhamento |
+| `memory_block/` | 5 | Tamanhos, little-endian, escritas estreitas, espelho por máscara, últimos bytes |
+| `bios_rom/` | 3 | 6 tamanhos inválidos rejeitados, leitura, arquivo ausente/grande/pequeno/válido |
+| `memory_control/` | 6 | Reset e janelas padrão, 8 valores de DRAM_CTRL, leituras estreitas, bits fixos, escrita estreita, reset |
+| `bus/` | 20 | RAM nos 3 segmentos, SB/SH, espelhos 0B88h, DRAM_CTRL 0888h/0000h, /RAS1, desalinhamento, scratchpad, BIOS (aliases, somente leitura, janela, espelho), Expansões 1/2/3 e POST, 12 endereços inexistentes, 14 lacunas de E/S, marcadores não implementados, dispositivo conectado, faixas de E/S, KSEG2, power_on/reset, varredura de 2 MiB |
+
+### Problemas encontrados e corrigidos
+1. **Queda do executável de testes (0xC0000005)** em `bios_rom/load_file`. Causa: o macro
+   `CHECK_EQ` do framework guardava `const auto&` para `synthetic_image(...)[12345]`, ou seja,
+   uma referência para dentro de um vetor temporário já destruído. O código do barramento
+   estava correto (valor 0xBF conferido). Correção: o macro copia os operandos (D-018).
+2. A cópia tornou constantes algumas comparações e o MSVC emitiu C4127 (tratado como erro);
+   a comparação passou a ser feita por função auxiliar.
+
+### Não testado
+- Comportamento com uma BIOS real (nenhuma foi fornecida; e ela ainda não seria executada).
+- Os casos ⚠️ (barramento aberto, escrita na ROM, reset do BCC etc.) seguem escolhas documentadas,
+  não medições em hardware.
 
 ## 15/11/2026 — Fase 0 (versão 0.0.1)
 

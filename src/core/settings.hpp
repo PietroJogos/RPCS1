@@ -3,8 +3,8 @@
 // As configurações são lidas de um arquivo INI (rpcs1.ini). Valores inválidos
 // geram erro com a seção/chave exatas; chaves desconhecidas geram avisos.
 //
-// Estado na Fase 0: apenas [Log] e [Video] têm efeito. [System] e [BIOS] são
-// lidas e validadas, mas ainda não são usadas — não existe emulação.
+// Estado na Fase 2: [Log] e [Video] têm efeito; [BIOS] path é carregado, validado e
+// mapeado no barramento (sem execução). [System] é lida e validada, mas ainda não é usada.
 #pragma once
 
 #include <filesystem>

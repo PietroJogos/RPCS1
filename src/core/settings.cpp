@@ -82,7 +82,8 @@ IniDocument Settings::to_ini() const {
     doc.set("BIOS", "path", unicode::path_to_utf8(bios_path));
     doc.set_comment("BIOS", "path",
                     "Arquivo de BIOS (512 KiB) extraído pelo próprio usuário de seu console.\n"
-                    "O RPCS1 não distribui BIOS. (Ainda sem efeito — Fase 15.)");
+                    "O RPCS1 não distribui BIOS. Hoje o arquivo é validado e mapeado na\n"
+                    "memória, mas não é executado (execução: Fase 15).");
 
     doc.set("Video", "scale", std::to_string(window_scale));
     doc.set_comment("Video", "scale",

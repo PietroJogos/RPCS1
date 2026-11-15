@@ -12,9 +12,14 @@ add_executable(rpcs1_tests
     core/test_settings.cpp
     core/test_strings.cpp
     core/test_unicode.cpp
+    bus/test_address.cpp
+    bus/test_bus.cpp
+    memory/test_bios_rom.cpp
+    memory/test_memory_block.cpp
+    memory/test_memory_control.cpp
     video/test_framebuffer.cpp)
 target_include_directories(rpcs1_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(rpcs1_tests PRIVATE rpcs1_core rpcs1_video)
+target_link_libraries(rpcs1_tests PRIVATE rpcs1_core rpcs1_hw rpcs1_video)
 rpcs1_configure_target(rpcs1_tests)
 
 add_test(NAME unit.all COMMAND rpcs1_tests)
@@ -62,6 +67,14 @@ add_test(NAME smoke.invalid_config
         "-DARGS=--headless|--config|${CMAKE_CURRENT_SOURCE_DIR}/data/invalid_scale.ini"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/smoke/expect_exit.cmake")
 set_tests_properties(smoke.invalid_config PROPERTIES LABELS "smoke")
+
+# BIOS sintética: carregada e mapeada; tamanho errado e arquivo ausente rejeitados.
+add_test(NAME smoke.bios_load
+    COMMAND ${CMAKE_COMMAND}
+        -DRPCS1_EXE=$<TARGET_FILE:rpcs1>
+        -DWORK_DIR=${RPCS1_SMOKE_DIR}/bios_load
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/smoke/bios_load.cmake")
+set_tests_properties(smoke.bios_load PROPERTIES LABELS "smoke")
 
 # Abre a janela Win32 de verdade e a fecha após 500 ms (requer área de trabalho interativa).
 if(WIN32)

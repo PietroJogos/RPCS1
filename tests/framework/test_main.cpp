@@ -75,6 +75,8 @@ int main(int argc, char** argv) {
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
 #endif
+    // Sem buffer: se um teste derrubar o processo, a saída anterior não se perde.
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
     using namespace rpcs1::test;
 
     std::vector<std::string> filters;

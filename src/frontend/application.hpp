@@ -6,6 +6,7 @@
 #include <span>
 #include <string>
 
+#include "bus/bus.hpp"
 #include "core/cli.hpp"
 #include "core/error.hpp"
 #include "core/log.hpp"
@@ -33,12 +34,14 @@ public:
 private:
     [[nodiscard]] Status load_settings(const CommandLine& cl);
     void configure_logging(const CommandLine& cl);
+    void initialize_hardware();
     [[nodiscard]] ExitCode run_window_loop(const CommandLine& cl);
 
     std::shared_ptr<log::ConsoleSink> console_sink_;
     std::shared_ptr<log::FileSink> file_sink_;
     std::filesystem::path config_path_;
     Settings settings_;
+    std::unique_ptr<bus::Bus> bus_;
 };
 
 } // namespace rpcs1::frontend

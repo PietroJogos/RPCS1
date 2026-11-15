@@ -78,9 +78,7 @@ ExitCode Application::run(std::span<const std::string> args) {
               model_info(settings_.model).name, to_string(settings_.effective_region()),
               settings_.bios_path.empty() ? std::string("(não configurada)")
                                           : unicode::path_to_utf8(settings_.bios_path));
-    log::warn(Category::Core,
-              "Fase 0: nenhum componente do PlayStation é emulado ainda. "
-              "Modelo, região e BIOS são apenas lidos e validados.");
+    initialize_hardware();
 
     if (cl.headless) {
         log::info(Category::Frontend, "Modo headless: inicialização concluída, encerrando.");
@@ -150,9 +148,33 @@ void Application::configure_logging(const CommandLine& cl) {
     log::info(Category::Core, "Log em arquivo: {}", unicode::path_to_utf8(path));
 }
 
+void Application::initialize_hardware() {
+    bus_ = std::make_unique<bus::Bus>();
+    log::info(Category::Bus,
+              "Barramento pronto: RAM 2 MiB, scratchpad 1 KiB, BIOS ROM 512 KiB, Memory Control");
+
+    if (settings_.bios_path.empty()) {
+        log::info(Category::Bios, "Nenhuma BIOS configurada ([BIOS] path).");
+    } else {
+        const auto path = resolve_path(config_path_.parent_path(), settings_.bios_path);
+        if (auto loaded = bus_->bios().load_file(path); !loaded) {
+            log::error(Category::Bios, "BIOS não carregada: {}", loaded.error().describe());
+        } else {
+            log::info(Category::Bios, "BIOS mapeada em BFC00000h; primeira instrução: {:08X}h",
+                      bus_->fetch_instruction(0xBFC00000).value);
+        }
+    }
+
+    // Honestidade sobre o estado: a BIOS é apenas mapeada, nunca executada nesta fase.
+    log::warn(Category::Core,
+              "Fase 2: memória e barramento emulados; CPU, GPU, SPU, CD-ROM e demais "
+              "periféricos ainda não existem. Nada é executado.");
+}
+
 ExitCode Application::run_window_loop(const CommandLine& cl) {
     video::WindowConfig config;
-    config.title = std::string(version::product) + " " + version::string + " — sem emulação (Fase 0)";
+    config.title = std::string(version::product) + " " + version::string +
+                   " — pré-alfa: nada é executado ainda";
     config.client_width = nominal_width * settings_.window_scale;
     config.client_height = nominal_height * settings_.window_scale;
 

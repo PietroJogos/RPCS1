@@ -2,6 +2,24 @@
 
 Formato baseado em "Keep a Changelog". Versões seguem SemVer; antes da 0.1.0 todas são pré-lançamentos.
 
+## [0.0.2] — 15/11/2026 — pré-alfa (Fase 2)
+
+### Adicionado
+- Barramento de memória: segmentos KUSEG/KSEG0/KSEG1/KSEG2, acessos de 8/16/32 bits,
+  erros de alinhamento e de barramento.
+- RAM de 2 MiB com janela e espelhos pelo DRAM_CTRL; scratchpad de 1 KiB; BIOS ROM de 512 KiB.
+- Memory Control (`1F801000h–1F801020h`, `1F801060h`, `FFFE0130h`) com janelas das regiões.
+- Regiões de expansão e registro do display POST (`1F802041h`).
+- Interface de periféricos de E/S com marcadores explícitos para os ainda não implementados.
+- `[BIOS] path` é carregado, validado e mapeado (não executado).
+- 38 testes unitários e 1 smoke test novos.
+
+### Corrigido
+- `CHECK_EQ` do framework de testes podia ler memória liberada.
+
+### Não incluído
+- CPU e demais periféricos: nada é executado.
+
 ## [0.0.1] — 15/11/2026 — pré-alfa (Fase 0)
 
 ### Adicionado

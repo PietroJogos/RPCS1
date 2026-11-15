@@ -28,6 +28,19 @@ endif()
 rpcs1_configure_target(rpcs1_core)
 
 # --------------------------------------------------------------------------
+# Hardware emulado — Fase 2: memória (RAM, scratchpad, BIOS ROM, Memory Control)
+# e barramento (segmentos, mapa físico, E/S mapeada, erros de acesso).
+# --------------------------------------------------------------------------
+add_library(rpcs1_hw STATIC
+    bus/address.cpp
+    bus/bus.cpp
+    bus/io_device.cpp
+    memory/bios_rom.cpp
+    memory/memory_control.cpp)
+target_link_libraries(rpcs1_hw PUBLIC rpcs1_core)
+rpcs1_configure_target(rpcs1_hw)
+
+# --------------------------------------------------------------------------
 # Video do hospedeiro: framebuffer e janela nativa (Win32).
 # --------------------------------------------------------------------------
 add_library(rpcs1_video STATIC
@@ -51,9 +64,11 @@ if(WIN32)
     configure_file(frontend/rpcs1.rc.in "${CMAKE_CURRENT_BINARY_DIR}/generated/rpcs1.rc" @ONLY)
     target_sources(rpcs1 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated/rpcs1.rc")
     if(MSVC)
-        target_sources(rpcs1 PRIVATE frontend/rpcs1.manifest)
+        configure_file(frontend/rpcs1.manifest.in
+            "${CMAKE_CURRENT_BINARY_DIR}/generated/rpcs1.manifest" @ONLY)
+        target_sources(rpcs1 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated/rpcs1.manifest")
     endif()
 endif()
-target_link_libraries(rpcs1 PRIVATE rpcs1_core rpcs1_video)
+target_link_libraries(rpcs1 PRIVATE rpcs1_core rpcs1_hw rpcs1_video)
 rpcs1_configure_target(rpcs1)
 set_target_properties(rpcs1 PROPERTIES OUTPUT_NAME "RPCS1")

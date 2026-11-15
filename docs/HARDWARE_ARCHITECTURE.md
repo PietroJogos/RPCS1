@@ -213,6 +213,33 @@ que o boot funcione.
   valor usual `00000B88h` (alguns modelos `00000888h`; placas PU-7/EARLY-PU-8 `00000B80h`).
 - A BIOS guarda o tamanho da RAM em MiB no endereço de RAM `00000060h`.
 
+### 4.1 Janela de RAM (DRAM_CTRL)
+
+O espaço de RAM decodificado tem 16 MiB a partir de `00000000h`, dividido em dois bancos:
+
+- banco /RAS0 = `1 MiB << ((bit9 << 1) | bit11)` → 1, 2, 4 ou 8 MiB;
+- banco /RAS1 = `1 MiB << ((bit8 << 1) | bit11)`, somente se o bit 10 = 1; fica logo após /RAS0;
+- o restante dos 16 MiB não é mapeado: o acesso gera exceção.
+
+Com o valor usual `0B88h` o banco 0 é configurado como 8 MiB; como os chips têm 2 MiB,
+surgem três espelhos acidentais (em 2, 4 e 6 MiB). `0888h` seria o valor "correto" para 2 MiB.
+Outros bits: 0–2 retenção de refresh durante DMA, 4–5 período de refresh, 7 estado de espera
+entre acessos consecutivos.
+
+### 4.2 Exceções de memória
+
+| Situação | Resultado |
+|---|---|
+| `LH/LHU/SH` em endereço ímpar, `LW/SW` fora de múltiplo de 4 | AdEL / AdES (BadVaddr atualizado) |
+| `LWL/LWR/SWL/SWR` | Nunca geram erro de alinhamento |
+| Regiões sem dispositivo, inclusive lacunas da área de E/S | Erro de barramento (IBE na busca, DBE em dados; BadVaddr **não** muda) |
+| KUSEG acima de 512 MiB (`20000000h–7FFFFFFFh`) | Exceção |
+| Acesso além da janela configurada em um Delay/Size | Erro de barramento |
+| Busca de instrução no scratchpad | Erro de barramento na primeira busca |
+| Scratchpad via KSEG1 (`BF800000h`) | Não mapeado |
+
+Em uma carga que gera exceção, o registrador de destino não é alterado.
+
 ---
 
 ## 5. Memory Control
@@ -232,6 +259,30 @@ que o boot funcione.
 
 Esses registradores definem tempos de acesso de cada dispositivo — relevantes para a
 contagem de ciclos (Fase 5) e para jogos sensíveis a temporização.
+
+Formato dos registradores Delay/Size (`1F801008h–1F80101Ch`):
+
+| Bits | Campo |
+|---|---|
+| 0–3 / 4–7 | Atraso de escrita / leitura (1 a 16 ciclos) |
+| 8–11 | Uso dos tempos COM0–COM3 (recuperação, retenção, flutuação, pré-strobe) |
+| 12 | Largura do barramento de dados (0 = 8 bits, 1 = 16 bits) |
+| 13 | Autoincremento de endereço |
+| 16–20 | N = bits de endereço → **janela de 1 << N bytes** |
+| 21–23 | Sempre zero |
+| 24–27, 29, 30 | Ajustes de temporização de DMA / DMA "largo" de 32 bits |
+| 28 | Flag de erro de endereço (escrever 1 limpa) |
+| 31 | Espera por dispositivo externo |
+
+Janelas resultantes dos valores usuais: Expansão 1 = 512 KiB (máx. 8 MiB), Expansão 3 = 1 byte
+(máx. 2 MiB), BIOS = 512 KiB (máx. 4 MiB), Expansão 2 = 128 bytes (máx. 8 KiB). Os campos de
+tamanho parecem ser ignorados para SPU e CD-ROM. A Expansão 2 parece aceitar apenas acessos de
+8 bits, e qualquer base diferente de `1F802000h` em `1F801004h` parece desabilitá-la.
+
+COM_DELAY (`1F801020h`): 4 bits para cada tempo COM0–COM3; bits 16–31 lidos como zero.
+
+Uma observação importante sobre escritas estreitas: em `SB`/`SH` a CPU coloca os **32 bits** do
+registrador no barramento; alguns registradores de E/S (ex.: DMA) aproveitam o valor inteiro.
 
 ---
 
@@ -952,6 +1003,16 @@ Requisitos para considerar o recurso implementado:
 | 9 | Regras exatas de rasterização (bordas, precisão de UV, dithering) | 8 |
 | 10 | Hashes de BIOS para identificação de versão | 15 |
 | 11 | Fearful Harmony: nenhum fato técnico confirmado | 17 |
+| 12 | Valor lido de regiões de expansão sem dispositivo (barramento aberto) | 2 ⚠️ adotado FFh |
+| 13 | Valores de power-on dos registradores de Memory Control e do BCC | 2 ⚠️ adotados os valores da BIOS / 0 |
+| 14 | Efeito de escrita na BIOS ROM | 2 ⚠️ adotado: ignorada |
+| 15 | Leituras estreitas de registradores de 32 bits; Memory Control respeita byte enables? | 2, 6 ⚠️ |
+| 16 | Banco /RAS1 habilitado sem chips; endereços não documentados de FFFE0000h–FFFE01FFh | 2 ⚠️ adotado: lê 0 |
+| 17 | Conflito: `1F801E80h` (SPU) "lê FFh" × regra geral de lacunas com erro de barramento | 11 |
+| 18 | Como habilitar o espelho da BIOS nos últimos 4 MiB (adotado: janela > 512 KiB espelha) | 15 |
+
+As escolhas marcadas como "adotado" estão justificadas em `docs/DECISIONS.md` (D-012 a D-017)
+e cobertas por testes, para que qualquer correção futura fique visível como mudança de teste.
 
 Itens de 1 a 9 serão resolvidos com programas de teste próprios e/ou suítes de teste públicas
 com licença compatível (a verificar caso a caso).
@@ -965,6 +1026,7 @@ Páginas consultadas (novembro de 2026):
 - psx-spx (índice): <https://psx-spx.consoledev.net/>
 - Mapa de memória: <https://psx-spx.consoledev.net/memorymap/>
 - Memory Control: <https://psx-spx.consoledev.net/memorycontrol/>
+- Porta de expansão (PIO): <https://psx-spx.consoledev.net/expansionportpio/>
 - Mapa de E/S: <https://psx-spx.consoledev.net/iomap/>
 - Interrupções: <https://psx-spx.consoledev.net/interrupts/>
 - DMA: <https://psx-spx.consoledev.net/dmachannels/>

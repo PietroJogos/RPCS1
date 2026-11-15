@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <assemblyIdentity type="win32" name="PiStudioBR.RPCS1" version="0.0.1.0" processorArchitecture="amd64"/>
+  <assemblyIdentity type="win32" name="PiStudioBR.RPCS1" version="@PROJECT_VERSION@.0" processorArchitecture="amd64"/>
   <description>RPCS1 - emulador original de PlayStation 1 (PiStudio BR)</description>
   <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
     <application>

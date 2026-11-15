@@ -85,6 +85,12 @@ std::string describe(const T& value) {
     }
 }
 
+// Comparação fora de expressão constante (evita o aviso C4127 com operandos constexpr).
+template <typename A, typename B>
+bool equals(const A& a, const B& b) {
+    return a == b;
+}
+
 // Pasta temporária exclusiva, removida ao sair do escopo.
 class TempDir {
 public:
@@ -132,11 +138,13 @@ private:
 #define CHECK(expr) RPCS1_CHECK_IMPL(expr, (void)0)
 #define REQUIRE(expr) RPCS1_CHECK_IMPL(expr, throw ::rpcs1::test::RequireFailure{})
 
+// Os operandos são copiados: guardar `const auto&` criaria referência pendente quando a
+// expressão devolve uma referência para dentro de um temporário (ex.: `make_vec()[i]`).
 #define RPCS1_CHECK_EQ_IMPL(a, b, on_fail)                                                      \
     do {                                                                                        \
-        const auto& rpcs1_a_ = (a);                                                             \
-        const auto& rpcs1_b_ = (b);                                                             \
-        if (!(rpcs1_a_ == rpcs1_b_)) {                                                          \
+        const auto rpcs1_a_ = (a);                                                              \
+        const auto rpcs1_b_ = (b);                                                              \
+        if (!::rpcs1::test::equals(rpcs1_a_, rpcs1_b_)) {                                       \
             ::rpcs1::test::report_failure(                                                      \
                 __FILE__, __LINE__,                                                             \
                 std::string("falhou: " #a " == " #b "\n      esquerda: ") +                     \

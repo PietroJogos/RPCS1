@@ -7,10 +7,10 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
 
 | Fase | Nome | Estado | Observações |
 |---|---|---|---|
-| 0 | Fundação do projeto | **concluída** | Build MSVC Debug/Release sem avisos; 61 testes unitários e 6 smoke tests passando |
+| 0 | Fundação do projeto | **concluída** | Build MSVC Debug/Release sem avisos; testes unitários e smoke tests passando |
 | 1 | Documentação técnica | **concluída (1ª versão)** | `HARDWARE_ARCHITECTURE.md`; 11 lacunas registradas para fases futuras |
-| 2 | Memória e barramento | não iniciada | Próxima fase |
-| 3 | CPU R3000A | não iniciada | |
+| 2 | Memória e barramento | **concluída** | 38 testes novos; 7 comportamentos não documentados adotados e marcados ⚠️ (D-012 a D-017) |
+| 3 | CPU R3000A | não iniciada | Próxima fase |
 | 4 | COP0, exceções, cache | não iniciada | |
 | 5 | Scheduler e timers | não iniciada | Decisão pendente sobre clock de vídeo PAL |
 | 6 | DMA | não iniciada | |
@@ -55,13 +55,32 @@ Uma fase só é "concluída" com implementação real, testes passando e documen
 - **Catálogo de modelos:** 17 modelos SCPH com região e BIOS associada; nenhum perfil de
   hardware implementado (`profile_implemented = false`).
 
+## Fase 2 — o que foi realmente implementado
+
+- **Endereçamento:** KUSEG/KSEG0/KSEG1/KSEG2, tradução para físico, verificação de alinhamento
+  (`BusFault::AddressError` → AdEL/AdES) e erro de barramento (`BusFault::BusError` → IBE/DBE)
+  para tudo que não existe, inclusive KUSEG acima de 512 MiB e lacunas da área de E/S.
+- **RAM principal de 2 MiB** com janela definida pelo DRAM_CTRL (bancos /RAS0 e /RAS1):
+  com o padrão `0B88h` surgem os três espelhos documentados; além da janela, erro de barramento.
+- **Scratchpad de 1 KiB** apenas em KUSEG/KSEG0, não executável.
+- **BIOS ROM de 512 KiB** carregada de arquivo do usuário (tamanho validado), somente leitura,
+  janela pelo registrador DEV2 (janela maior espelha a ROM).
+- **Memory Control:** 9 registradores de `1F801000h`, DRAM_CTRL e BCC, com bits fixos e janelas
+  `1 << N` das Expansões 1/2/3 e da BIOS.
+- **Expansões:** sem dispositivo (barramento aberto FFh ⚠️); Expansão 2 só 8 bits, desabilitada
+  se a base mudar; registro do display **POST** (`1F802041h`) com log.
+- **E/S mapeada:** interface `IoDevice`; as 9 faixas de periféricos usam marcadores explícitos
+  `UnimplementedDevice` (leem 0 e avisam no log, citando a fase prevista).
+- **Frontend:** `[BIOS] path` agora é carregado e mapeado (sem execução) e o resultado aparece no log.
+
 ## Recursos ausentes (conscientemente)
 
-Todo o hardware do PlayStation: CPU, barramento, GPU, GTE, MDEC, SPU, CD-ROM, DMA, timers,
-IRQ, SIO, controles, Memory Cards, BIOS. Também: áudio do hospedeiro, entrada, menus,
-save states, debugger.
+- CPU e todos os periféricos (GPU, GTE, MDEC, SPU, CD-ROM, DMA, timers, IRQ, SIO, controles,
+  Memory Cards); execução da BIOS.
+- No barramento: temporização dos acessos e fila de escrita (Fase 5), isolamento de cache e
+  efeitos do BCC (Fase 4), realocação da Expansão 1, dispositivos de expansão.
 
 ## Próxima dependência técnica
 
-**Fase 2 — barramento de memória** (`src/bus`, `src/memory`): é a base que a CPU (Fase 3)
-precisa para buscar instruções e acessar dados.
+**Fase 3 — CPU R3000A (interpretador)** (`src/cpu`): busca instruções pelo `Bus`, que já entrega
+os erros de alinhamento e de barramento que a CPU transformará em exceções na Fase 4.
